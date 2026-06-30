@@ -68,10 +68,10 @@ Threat Intel Arbiter is entirely configuration-driven. No database UI needed.
 - **Confidence-aware routing** — high severity + low confidence routes differently
 - **False-positive feedback loop** — calibration quality improves over time
 
-![threatlib Architecture](docs/threatlib-architecture.png)
+![Threat Intel Arbiter Architecture](docs/threat-intel-arbiter-architecture.png)
 
-> [Interactive architecture diagram →](docs/threatlib-architecture.html)
-> [Complete design document →](docs/threatlib-design.md)
+> [Interactive architecture diagram →](docs/threat-intel-arbiter-architecture.html)
+> [Complete design document →](docs/threat-intel-arbiter-design.md)
 
 ---
 

@@ -14,7 +14,7 @@ Every alert includes:
 - **Confidence** — how sure are we? (high, medium, low)
 - **Explanation** — exactly why, with evidence and score breakdown
 
-## What threatlib Is NOT
+## What Threat Intel Arbiter Is NOT
 
 - It is NOT a threat intelligence platform (MISP does that)
 - It is NOT a vulnerability scanner (Nessus/Qualys do that)
@@ -718,7 +718,7 @@ Everything else is Go standard library.
 
 ```bash
 # Build
-go build -o threatlib ./cmd/threatlib/
+go build -o arbiter ./cmd/threatlib/
 
 # Run
 export MISP_API_KEY="xxx"
@@ -726,7 +726,7 @@ export THREATLIB_ADMIN_KEY="yyy"
 export SMTP_PASSWORD="zzz"
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/..."
 
-./threatlib --config ./config/
+./arbiter --config ./config/
 ```
 
 Requirements:
@@ -749,7 +749,7 @@ Most threat intelligence platforms require substantial infrastructure:
 | OpenCTI | Node.js, PostgreSQL, Redis, ElasticSearch, MinIO, RabbitMQ, Python workers |
 | ThreatConnect | SaaS platform, or heavy on-prem Java/Elasticsearch stack |
 | Yeti | Python, MongoDB, Redis, Node.js frontend |
-| **threatlib** | **One Go binary. Nothing else.** |
+| **Threat Intel Arbiter** | **One Go binary. Nothing else.** |
 
 This means:
 - **Deploy in under 60 seconds.** Download binary, set 4 environment variables, run.
@@ -787,7 +787,7 @@ binary that runs in their existing environment is an easy yes.
 
 ## Scope Boundaries
 
-**threatlib does:**
+**Threat Intel Arbiter does:**
 - Pull threat intelligence from multiple sources
 - Normalize into a canonical model
 - Filter false positives
@@ -799,7 +799,7 @@ binary that runs in their existing environment is an easy yes.
 - Expose health and metrics
 - Shut down gracefully
 
-**threatlib does NOT:**
+**Threat Intel Arbiter does NOT:**
 - Ingest threat feeds (sources do that)
 - Correlate IOCs (MISP does that)
 - Scan for vulnerabilities (Nessus/Qualys do that)
@@ -825,7 +825,7 @@ binary that runs in their existing environment is an easy yes.
 ## File Structure
 
 ```
-threatlib/
+threat-intel-arbiter/
 ├── cmd/threatlib/main.go
 ├── internal/
 │   ├── source/                    # Threat source connectors
@@ -885,8 +885,8 @@ threatlib/
 │   ├── risk.yaml
 │   └── matchers.yaml
 ├── docs/
-│   ├── threatlib-architecture.html
-│   └── threatlib-design.md
+│   ├── threat-intel-arbiter-architecture.html
+│   └── threat-intel-arbiter-design.md
 ├── go.mod
 ├── go.sum
 └── README.md
@@ -910,7 +910,7 @@ threatlib/
 
 ## Summary
 
-threatlib is a **threat prioritization engine** that:
+Threat Intel Arbiter is a **threat prioritization engine** that:
 
 1. Connects to multiple threat sources (MISP + CISA KEV in v1)
 2. Normalizes everything into a canonical event model
