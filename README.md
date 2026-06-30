@@ -30,7 +30,7 @@ CISA KEV ─┤──► Normalize ──► Filter ──► Match ──► Sc
 
 ```bash
 # Build
-go build -o threatlib ./cmd/threatlib/
+go build -o arbiter ./cmd/threatlib/
 
 # Configure
 cp config/techstack.csv.example config/techstack.csv   # Your app inventory
@@ -39,7 +39,7 @@ cp config/techstack.csv.example config/techstack.csv   # Your app inventory
 
 # Run
 export MISP_API_KEY="your-key"
-./threatlib --config ./config/
+./arbiter --config ./config/
 ```
 
 ---
@@ -100,7 +100,7 @@ v2 roadmap: GitHub Advisory, NVD API, vendor feeds.
 ## Deployment
 
 ```bash
-go build -o threatlib ./cmd/threatlib/
+go build -o arbiter ./cmd/threatlib/
 # → 15MB static binary
 # → Copy to any Linux/macOS/Windows machine
 # → Run. Done.
