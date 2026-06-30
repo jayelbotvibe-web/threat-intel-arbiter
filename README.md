@@ -68,8 +68,10 @@ threatlib is entirely configuration-driven. No database UI needed.
 - **Confidence-aware routing** — high severity + low confidence routes differently
 - **False-positive feedback loop** — calibration quality improves over time
 
-[Full architecture diagram →](docs/threatlib-architecture.html)
-[Complete design document →](docs/threatlib-design.md)
+![threatlib Architecture](docs/threatlib-architecture.png)
+
+> [Interactive architecture diagram →](docs/threatlib-architecture.html)
+> [Complete design document →](docs/threatlib-design.md)
 
 ---
 
