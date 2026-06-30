@@ -1,5 +1,5 @@
 # Build output
-threatlib
+arbiter
 tmp/
 
 # Database
@@ -14,4 +14,3 @@ data/*.db
 # OS
 .DS_Store
 Thumbs.db
-arbiter

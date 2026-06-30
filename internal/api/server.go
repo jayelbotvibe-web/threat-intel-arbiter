@@ -79,7 +79,7 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, `{"error":"admin key not configured"}`, http.StatusInternalServerError)
 			return
 		}
-		key := r.Header.Get("X-Threatlib-Key")
+		key := r.Header.Get("X-Arbiter-Key")
 		if key == "" || key != s.AdminKey {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return

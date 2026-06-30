@@ -129,7 +129,7 @@
     function adminAPI(path, body) {
       return fetch(API + path, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Threatlib-Key': ADMIN_KEY },
+        headers: { 'Content-Type': 'application/json', 'X-Arbiter-Key': ADMIN_KEY },
         body: JSON.stringify(body)
       }).then(r => r.json());
     }
@@ -217,7 +217,7 @@
       reader.onload = function() {
         fetch(API + '/admin/import', {
           method: 'POST',
-          headers: { 'Content-Type': 'text/csv', 'X-Threatlib-Key': ADMIN_KEY },
+          headers: { 'Content-Type': 'text/csv', 'X-Arbiter-Key': ADMIN_KEY },
           body: reader.result
         }).then(r => r.json()).then(data => {
           const div = document.getElementById('importResult');
