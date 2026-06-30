@@ -1,8 +1,8 @@
-# threatlib — Complete System Design Document (Foundation-First)
+# Threat Intel Arbiter — Complete System Design Document (Foundation-First)
 
-## What threatlib Is
+## What Threat Intel Arbiter Is
 
-threatlib is a **threat prioritization engine**. It transforms raw threat intelligence
+Threat Intel Arbiter is a **threat prioritization engine**. It transforms raw threat intelligence
 from multiple sources into organisation-specific, scored, and explained actions.
 
 It answers one question:

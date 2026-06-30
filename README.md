@@ -1,8 +1,8 @@
-# threatlib — Threat Prioritization Engine
+# Threat Intel Arbiter — Threat Prioritization Engine
 
 **Deploy in 60 seconds. Single Go binary. Zero dependencies.**
 
-threatlib transforms raw threat intelligence into organisation-specific, scored, and explained actions. It answers one question:
+Threat Intel Arbiter transforms raw threat intelligence into organisation-specific, scored, and explained actions. It answers one question:
 
 > **Should this organisation care about this threat right now?**
 
@@ -46,7 +46,7 @@ export MISP_API_KEY="your-key"
 
 ## Configuration
 
-threatlib is entirely configuration-driven. No database UI needed.
+Threat Intel Arbiter is entirely configuration-driven. No database UI needed.
 
 | File | Purpose |
 |------|---------|
