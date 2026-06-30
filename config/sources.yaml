@@ -3,7 +3,7 @@ sources:
   - id: misp-primary
     type: misp
     name: "NanoFab MISP"
-    url: "https://localhost:8443"
+    url: "http://localhost:8081"
     auth_key_env: MISP_API_KEY
     confidence: high
     enabled: true
