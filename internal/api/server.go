@@ -1,7 +1,9 @@
 package api
 
 import (
+	"embed"
 	"encoding/json"
+	"io/fs"
 	"log"
 	"net/http"
 	"strings"
@@ -10,6 +12,9 @@ import (
 	"github.com/jayelbotvibe-web/threatlib/internal/model"
 	"github.com/jayelbotvibe-web/threatlib/internal/store"
 )
+
+//go:embed dashboard.html
+var dashboardFS embed.FS
 
 // Server holds the HTTP server dependencies.
 type Server struct {
@@ -44,6 +49,17 @@ func (s *Server) ListenAndServe(addr string) error {
 }
 
 func (s *Server) registerRoutes() {
+	// Dashboard
+	dashboardHTML, _ := fs.ReadFile(dashboardFS, "dashboard.html")
+	s.Mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(dashboardHTML)
+	})
+
 	// Public read endpoints
 	s.Mux.HandleFunc("/health", s.handleHealth)
 	s.Mux.HandleFunc("/api/alerts", s.handleAlerts)

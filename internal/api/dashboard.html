@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Threat Intel Arbiter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 1.25rem; }
+    .stat-num { font-size: 2rem; font-weight: 700; }
+    .row-hover:hover { background: rgba(30,41,59,0.5); }
+    .badge-crit { background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
+    .badge-high { background: #7c2d12; color: #fdba74; border: 1px solid #9a3412; }
+    .badge-med  { background: #713f12; color: #fde047; border: 1px solid #854d0e; }
+    .badge-low  { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    button { cursor: pointer; transition: all 0.15s; }
+    button:hover { filter: brightness(1.2); }
+    .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-weight: 600; z-index: 100; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="p-6">
+  <div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" id="statusDot"></div>
+        <h1 class="text-2xl font-bold tracking-tight">Threat Intel Arbiter</h1>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-slate-400" id="lastUpdate">—</span>
+        <button onclick="refreshAll()" class="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Stat Bar -->
+    <div class="grid grid-cols-5 gap-4 mb-6">
+      <div class="card text-center">
+        <div class="stat-num text-rose-400" id="statCritical">—</div>
+        <div class="text-xs text-slate-400 mt-1">Critical</div>
+      </div>
+      <div class="card text-center">
+        <div class="stat-num text-amber-400" id="statHigh">—</div>
+        <div class="text-xs text-slate-400 mt-1">High</div>
+      </div>
+      <div class="card text-center">
+        <div class="stat-num text-yellow-400" id="statMedium">—</div>
+        <div class="text-xs text-slate-400 mt-1">Medium</div>
+      </div>
+      <div class="card text-center">
+        <div class="stat-num text-slate-400" id="statLow">—</div>
+        <div class="text-xs text-slate-400 mt-1">Low</div>
+      </div>
+      <div class="card text-center">
+        <div class="stat-num text-cyan-400" id="statApps">—</div>
+        <div class="text-xs text-slate-400 mt-1">Apps Tracked</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-0 mb-6 border-b border-slate-700">
+      <button class="px-4 py-2 text-sm font-medium border-b-2 border-cyan-400 text-cyan-400" onclick="switchTab('alerts')" id="tab-alerts">Alerts</button>
+      <button class="px-4 py-2 text-sm font-medium text-slate-500" onclick="switchTab('import')" id="tab-import">Import CSV</button>
+      <button class="px-4 py-2 text-sm font-medium text-slate-500" onclick="switchTab('techstack')" id="tab-techstack">Tech Stack</button>
+    </div>
+
+    <!-- Alerts Tab -->
+    <div id="panel-alerts">
+      <div class="flex items-center gap-2 mb-3">
+        <button class="px-2 py-0.5 text-xs rounded-full border border-rose-700 bg-rose-900/20 text-rose-300" onclick="filterAlerts('critical')">Critical</button>
+        <button class="px-2 py-0.5 text-xs rounded-full border border-amber-700 bg-amber-900/20 text-amber-300" onclick="filterAlerts('high')">High</button>
+        <button class="px-2 py-0.5 text-xs rounded-full border border-yellow-700 bg-yellow-900/20 text-yellow-300" onclick="filterAlerts('medium')">Medium</button>
+        <button class="px-2 py-0.5 text-xs rounded-full border border-slate-600 text-slate-400" onclick="filterAlerts('all')">All</button>
+      </div>
+      <div class="card p-0 overflow-hidden">
+        <div class="grid grid-cols-12 gap-2 px-4 py-2 text-xs text-slate-500 border-b border-slate-700 font-medium">
+          <div class="col-span-1">Sev</div>
+          <div class="col-span-1">Conf</div>
+          <div class="col-span-3">Event</div>
+          <div class="col-span-2">Matched Apps</div>
+          <div class="col-span-2">Status</div>
+          <div class="col-span-2">Time</div>
+          <div class="col-span-1"></div>
+        </div>
+        <div id="alertList">
+          <div class="px-4 py-8 text-center text-slate-500">Loading alerts...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import Tab -->
+    <div id="panel-import" style="display:none">
+      <div class="card max-w-2xl">
+        <h2 class="text-lg font-semibold mb-2">Import Tech Stack CSV</h2>
+        <p class="text-xs text-slate-400 mb-4">Upload a CSV with columns: name, version, vendor, category, criticality, owner_team, internet_facing, hosts, data_sensitivity</p>
+        <div class="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center mb-4" id="dropZone">
+          <p class="text-slate-400 mb-3">Drop CSV file here or click to select</p>
+          <input type="file" accept=".csv" id="csvFile" class="hidden" onchange="handleCSV(this)">
+          <button onclick="document.getElementById('csvFile').click()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-medium">Choose File</button>
+        </div>
+        <div id="importResult" class="hidden text-sm"></div>
+      </div>
+    </div>
+
+    <!-- Tech Stack Tab -->
+    <div id="panel-techstack" style="display:none">
+      <div class="card p-0 overflow-hidden">
+        <div id="techstackList">
+          <div class="px-4 py-8 text-center text-slate-500">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const API = '';
+    const ADMIN_KEY = localStorage.getItem('arbiter_admin_key') || '';
+
+    function api(path) {
+      return fetch(API + path)
+        .then(r => r.json())
+        .catch(e => console.error(path, e));
+    }
+
+    function adminAPI(path, body) {
+      return fetch(API + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Threatlib-Key': ADMIN_KEY },
+        body: JSON.stringify(body)
+      }).then(r => r.json());
+    }
+
+    function severityBadge(sev) {
+      const map = { critical: 'badge-crit', high: 'badge-high', medium: 'badge-med', low: 'badge-low' };
+      return `<span class="${map[sev] || 'badge-low'} text-xs px-2 py-0.5 rounded-full">${sev.toUpperCase()}</span>`;
+    }
+
+    function refreshAll() {
+      // Stats
+      api('/api/stats').then(data => {
+        if (!data || !data.alerts) return;
+        document.getElementById('statCritical').textContent = data.alerts.critical || 0;
+        document.getElementById('statHigh').textContent = data.alerts.high || 0;
+        document.getElementById('statMedium').textContent = data.alerts.medium || 0;
+        document.getElementById('statLow').textContent = data.alerts.low || 0;
+        document.getElementById('statApps').textContent = data.apps_tracked || 0;
+        document.getElementById('lastUpdate').textContent = 'Updated just now';
+      });
+
+      // Alerts
+      api('/api/alerts').then(data => {
+        if (!data || !data.alerts) return;
+        const list = document.getElementById('alertList');
+        if (data.alerts.length === 0) {
+          list.innerHTML = '<div class="px-4 py-8 text-center text-slate-500">No alerts yet. Connect MISP or KEV to start receiving threat intelligence.</div>';
+          return;
+        }
+        list.innerHTML = data.alerts.map(a => `
+          <div class="grid grid-cols-12 gap-2 px-4 py-2.5 text-sm row-hover border-b border-slate-800 items-center alert-row" data-severity="${a.severity}">
+            <div class="col-span-1">${severityBadge(a.severity)}</div>
+            <div class="col-span-1 text-xs">${a.confidence}</div>
+            <div class="col-span-3 text-xs truncate" title="${a.event_id}">${a.event_id.substring(0,20)}...</div>
+            <div class="col-span-2 text-xs text-slate-400">${(a.matched_apps || '[]').substring(0,30)}</div>
+            <div class="col-span-2 text-xs">
+              <span class="${a.status === 'new' ? 'text-rose-400' : a.status === 'acked' ? 'text-amber-400' : 'text-emerald-400'}">${a.status}</span>
+            </div>
+            <div class="col-span-2 text-xs text-slate-500">${(a.created_at||'').substring(11,19)}</div>
+            <div class="col-span-1">
+              <button onclick="ackAlert('${a.id}')" class="text-xs px-2 py-0.5 rounded border border-slate-600 text-slate-400 hover:bg-slate-700">Ack</button>
+            </div>
+          </div>
+        `).join('');
+      });
+
+      // Tech stack
+      api('/api/techstack').then(data => {
+        if (!data || !data.apps) return;
+        document.getElementById('techstackList').innerHTML = `
+          <div class="grid grid-cols-5 gap-2 px-4 py-2 text-xs text-slate-500 border-b border-slate-700 font-medium">
+            <div>Application</div><div>Version</div><div>Criticality</div><div>Internet</div><div>Category</div>
+          </div>
+          ${data.apps.slice(0, 50).map(a => `
+            <div class="grid grid-cols-5 gap-2 px-4 py-2 text-sm row-hover border-b border-slate-800">
+              <div>${a.name}</div>
+              <div class="text-slate-400 text-xs">${a.version || '—'}</div>
+              <div>${severityBadge(a.criticality)}</div>
+              <div class="text-xs">${a.internet_facing ? '🌐 yes' : '🔒 no'}</div>
+              <div class="text-slate-400 text-xs">${a.category || '—'}</div>
+            </div>
+          `).join('')}
+          ${data.count > 50 ? `<div class="px-4 py-2 text-xs text-slate-500">+ ${data.count - 50} more</div>` : ''}
+        `;
+      });
+    }
+
+    function filterAlerts(sev) {
+      document.querySelectorAll('.alert-row').forEach(row => {
+        row.style.display = (sev === 'all' || row.dataset.severity === sev) ? '' : 'none';
+      });
+    }
+
+    function ackAlert(id) {
+      adminAPI('/admin/ack/' + id, { status: 'acked' }).then(r => {
+        showToast(r.status === 'ok' ? 'Alert acknowledged' : 'Error: ' + (r.error || 'unknown'), r.status === 'ok');
+        if (r.status === 'ok') setTimeout(refreshAll, 500);
+      });
+    }
+
+    function handleCSV(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function() {
+        fetch(API + '/admin/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/csv', 'X-Threatlib-Key': ADMIN_KEY },
+          body: reader.result
+        }).then(r => r.json()).then(data => {
+          const div = document.getElementById('importResult');
+          div.className = 'text-sm mt-3 p-3 rounded-lg ' + (data.status === 'ok' ? 'bg-emerald-900/30 text-emerald-300' : 'bg-rose-900/30 text-rose-300');
+          div.classList.remove('hidden');
+          div.textContent = `Imported ${data.imported} apps · ${data.added} added · ${data.removed} removed`;
+          if (data.status === 'ok') setTimeout(refreshAll, 500);
+        }).catch(e => {
+          showToast('Import failed: ' + e, false);
+        });
+      };
+      reader.readAsText(file);
+    }
+
+    function switchTab(name) {
+      ['alerts', 'import', 'techstack'].forEach(t => {
+        document.getElementById('panel-' + t).style.display = t === name ? '' : 'none';
+        const btn = document.getElementById('tab-' + t);
+        if (t === name) { btn.className = 'px-4 py-2 text-sm font-medium border-b-2 border-cyan-400 text-cyan-400'; }
+        else { btn.className = 'px-4 py-2 text-sm font-medium text-slate-500'; }
+      });
+    }
+
+    function showToast(msg, ok) {
+      const t = document.createElement('div');
+      t.className = 'toast ' + (ok ? 'bg-emerald-800 text-emerald-200' : 'bg-rose-800 text-rose-200');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+
+    // Drag and drop
+    const dropZone = document.getElementById('dropZone');
+    if (dropZone) {
+      dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('border-cyan-400'); });
+      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-cyan-400'));
+      dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('border-cyan-400');
+        const dt = e.dataTransfer;
+        if (dt.files.length) {
+          document.getElementById('csvFile').files = dt.files;
+          handleCSV(document.getElementById('csvFile'));
+        }
+      });
+    }
+
+    // Load on start
+    refreshAll();
+    setInterval(refreshAll, 30000);
+  </script>
+</body>
+</html>
