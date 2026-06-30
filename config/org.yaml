@@ -1,0 +1,7 @@
+# threatlib — Organisation Profile
+org:
+  name: "NanoFab Semiconductor Inc."
+  sector: "eu-nis-oes-manufacturing"
+  country: "BE"
+  timezone: "Europe/Brussels"
+  data_sensitivity: "critical"

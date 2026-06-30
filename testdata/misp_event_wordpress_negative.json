@@ -1,0 +1,81 @@
+{
+  "note": "This CVE targets WordPress which is NOT in the semiconductor tech stack. No matcher should fire — negative test.",
+  "response": [
+    {
+      "Event": {
+        "id": "1005",
+        "orgc_id": "1",
+        "org_id": "1",
+        "date": "2024-07-13",
+        "threat_level_id": "1",
+        "info": "CVE-2024-22158 — WordPress Critical RCE",
+        "published": true,
+        "uuid": "e5f6a7b8-c9d0-1234-efab-345678901234",
+        "attribute_count": "2",
+        "analysis": "2",
+        "timestamp": "1720875600",
+        "distribution": "3",
+        "sharing_group_id": "0",
+        "Org": {
+          "id": "1",
+          "name": "CIRCL",
+          "uuid": "circl-org-uuid-0001"
+        },
+        "Orgc": {
+          "id": "1",
+          "name": "CIRCL",
+          "uuid": "circl-org-uuid-0001"
+        },
+        "Tag": [
+          {
+            "id": "112",
+            "name": "tlp:white",
+            "colour": "#FFFFFF",
+            "exportable": true
+          }
+        ],
+        "Attribute": [
+          {
+            "id": "10010",
+            "event_id": "1005",
+            "category": "External analysis",
+            "type": "vulnerability",
+            "value1": "CVE-2024-22158",
+            "value2": "",
+            "to_ids": false,
+            "uuid": "attr-uuid-10010",
+            "timestamp": "1720875600",
+            "distribution": "5",
+            "comment": "Critical RCE in WordPress 6.4. Not in our tech stack.",
+            "deleted": false,
+            "Tag": [
+              {
+                "id": "204",
+                "name": "cvss:9.8",
+                "colour": "#FF0000",
+                "exportable": true
+              }
+            ]
+          },
+          {
+            "id": "10011",
+            "event_id": "1005",
+            "category": "External analysis",
+            "type": "link",
+            "value1": "https://nvd.nist.gov/vuln/detail/CVE-2024-22158",
+            "value2": "",
+            "to_ids": false,
+            "uuid": "attr-uuid-10011",
+            "timestamp": "1720875600",
+            "distribution": "5",
+            "comment": "NVD reference",
+            "deleted": false
+          }
+        ],
+        "Object": [],
+        "Galaxy": [],
+        "Sighting": []
+      }
+    }
+  ]
+}

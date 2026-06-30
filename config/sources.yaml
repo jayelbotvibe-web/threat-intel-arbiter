@@ -1,0 +1,19 @@
+# threatlib — Threat Sources
+sources:
+  - id: misp-primary
+    type: misp
+    name: "NanoFab MISP"
+    url: "https://localhost:8443"
+    auth_key_env: MISP_API_KEY
+    confidence: high
+    enabled: true
+    pull_interval: 15m
+    cold_start_days: 7
+
+  - id: cisa-kev
+    type: cisa-kev
+    name: "CISA Known Exploited Vulnerabilities"
+    url: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+    confidence: high
+    enabled: true
+    pull_interval: 24h

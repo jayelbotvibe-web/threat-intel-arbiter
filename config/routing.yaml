@@ -1,0 +1,43 @@
+# threatlib — Alert Routing Rules
+# Rules evaluated top-to-bottom. First match on (severity + confidence) wins.
+
+rules:
+  - severity: critical
+    confidence: [high]
+    channels: [slack, email]
+    slack_channel: "#sec-alerts"
+    email_to: "soc@nanofab.example.com"
+    format: realtime
+
+  - severity: critical
+    confidence: [medium]
+    channels: [slack, email]
+    slack_channel: "#sec-alerts"
+    email_to: "soc@nanofab.example.com"
+    format: realtime
+
+  - severity: critical
+    confidence: [low]
+    channels: [slack]
+    slack_channel: "#sec-review"
+    format: realtime
+
+  - severity: high
+    confidence: [high, medium]
+    channels: [slack]
+    slack_channel: "#it-ops"
+    format: realtime
+
+  - severity: high
+    confidence: [low]
+    channels: [email]
+    email_to: "soc-lead@nanofab.example.com"
+    format: daily_digest
+
+  - severity: medium
+    channels: [email]
+    email_to: "ciso@nanofab.example.com"
+    format: weekly_digest
+
+  - severity: low
+    channels: []

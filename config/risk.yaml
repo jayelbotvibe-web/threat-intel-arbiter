@@ -1,0 +1,62 @@
+# threatlib — Risk Prioritization Configuration
+# ⚠ All thresholds are initial values. Must be calibrated against production data.
+
+dimensions:
+  likelihood:
+    max: 5
+    factors:
+      active_exploitation: 3
+      weaponization: 2
+      actor_activity: 1
+      freshness_7d: 1
+      stale_90d: -1
+
+  impact:
+    max: 5
+    factors:
+      cvss_critical: 3
+      cvss_high: 2
+      cvss_medium: 1
+      app_criticality_critical: 2
+      app_criticality_high: 1
+      data_sensitivity_high: 1
+
+  exposure:
+    max: 3
+    factors:
+      internet_facing: 2
+      untrusted_network: 1
+      credential_exposure: 1
+
+  confidence:
+    max: 4
+    factors:
+      source_cert_or_kev: 3
+      source_trusted_misp: 2
+      vendor_confirmed: 2
+      sightings_gte_3: 2
+      sightings_gte_1: 1
+      single_low_trust: 0
+      disputed: -1
+
+severity:
+  thresholds:
+    critical: 0.50
+    high: 0.25
+    medium: 0.10
+
+confidence_label:
+  thresholds:
+    high: 3
+    medium: 2
+
+suppression:
+  version_not_affected: true
+  disputed_cve: true
+  tlp_red: true
+  older_than_days: 30
+
+match_confidence_weight:
+  exact_version_match: 1.0
+  product_only_match: 0.7
+  unparseable_version: 0.5

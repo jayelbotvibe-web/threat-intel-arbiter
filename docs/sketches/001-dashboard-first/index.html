@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>threatlib — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; background: #0f172a; color: #e2e8f0; line-height: 1.5; }
+    .badge-crit { background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
+    .badge-high { background: #7c2d12; color: #fdba74; border: 1px solid #9a3412; }
+    .badge-med { background: #713f12; color: #fde047; border: 1px solid #854d0e; }
+    .badge-low { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .badge-info { background: #1e3a5f; color: #7dd3fc; border: 1px solid #1e40af; }
+    .row-hover:hover { background: rgba(30, 41, 59, 0.4); }
+    .card-dark { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 1.25rem; }
+    .stat-num { font-size: 1.75rem; font-weight: 700; }
+    .tab-active { border-bottom: 2px solid #22d3ee; color: #22d3ee; }
+    .tab-inactive { color: #64748b; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; align-items: center; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.5rem; max-width: 640px; width: 100%; max-height: 80vh; overflow-y: auto; }
+    button { cursor: pointer; transition: all 0.15s; }
+    button:hover { filter: brightness(1.2); }
+  </style>
+</head>
+<body class="p-6">
+  <div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></div>
+        <h1 class="text-xl font-bold tracking-tight">threatlib</h1>
+        <span class="text-xs text-slate-500 ml-2">v0.1.0 · MISP connected</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-slate-400">Last pull: 2 min ago</span>
+        <button class="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600">Pull Now</button>
+        <button onclick="document.getElementById('settings-modal').classList.toggle('active')" class="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600">⚙ Settings</button>
+      </div>
+    </div>
+
+    <!-- Stat Bar -->
+    <div class="grid grid-cols-5 gap-4 mb-6">
+      <div class="card-dark text-center">
+        <div class="stat-num text-rose-400">3</div>
+        <div class="text-xs text-slate-400 mt-1">Critical</div>
+      </div>
+      <div class="card-dark text-center">
+        <div class="stat-num text-amber-400">7</div>
+        <div class="text-xs text-slate-400 mt-1">High</div>
+      </div>
+      <div class="card-dark text-center">
+        <div class="stat-num text-yellow-400">14</div>
+        <div class="text-xs text-slate-400 mt-1">Medium</div>
+      </div>
+      <div class="card-dark text-center">
+        <div class="stat-num text-slate-400">42</div>
+        <div class="text-xs text-slate-400 mt-1">Low</div>
+      </div>
+      <div class="card-dark text-center">
+        <div class="stat-num text-cyan-400">187</div>
+        <div class="text-xs text-slate-400 mt-1">Apps Tracked</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex items-center gap-3 mb-4">
+      <span class="text-xs text-slate-400">Filter:</span>
+      <button class="px-3 py-1 text-xs rounded-full border border-rose-700 bg-rose-900/30 text-rose-300 hover:bg-rose-900/50">Critical</button>
+      <button class="px-3 py-1 text-xs rounded-full border border-amber-700 bg-amber-900/30 text-amber-300 hover:bg-amber-900/50">High</button>
+      <button class="px-3 py-1 text-xs rounded-full border border-yellow-700 bg-yellow-900/30 text-yellow-300 hover:bg-yellow-900/50">Medium</button>
+      <button class="px-3 py-1 text-xs rounded-full border border-slate-600 bg-transparent text-slate-400 hover:bg-slate-800">All</button>
+      <span class="text-xs text-slate-600 mx-2">|</span>
+      <button class="px-3 py-1 text-xs rounded-full border border-slate-600 bg-transparent text-slate-400 hover:bg-slate-800">Unacknowledged only</button>
+      <button class="px-3 py-1 text-xs rounded-full border border-slate-600 bg-transparent text-slate-400 hover:bg-slate-800">Internet-facing only</button>
+      <div class="flex-1"></div>
+      <input class="px-3 py-1 text-xs bg-slate-800 border border-slate-600 rounded-lg text-slate-300 w-48" placeholder="Search alerts...">
+    </div>
+
+    <!-- Alert Feed -->
+    <div class="card-dark p-0 overflow-hidden">
+      <!-- Table Header -->
+      <div class="grid grid-cols-12 gap-3 px-4 py-2.5 text-xs text-slate-500 border-b border-slate-700 font-medium">
+        <div class="col-span-1">Sev</div>
+        <div class="col-span-2">CVE / Title</div>
+        <div class="col-span-2">Affected App</div>
+        <div class="col-span-1">CVSS</div>
+        <div class="col-span-1">Exposure</div>
+        <div class="col-span-2">Source</div>
+        <div class="col-span-1">Routed To</div>
+        <div class="col-span-1">When</div>
+        <div class="col-span-1"></div>
+      </div>
+      <!-- Row 1 - Critical -->
+      <div class="grid grid-cols-12 gap-3 px-4 py-3 text-sm row-hover border-b border-slate-800 items-center" id="alert-1">
+        <div class="col-span-1"><span class="badge-crit text-xs px-2 py-0.5 rounded-full">CRIT</span></div>
+        <div class="col-span-2 font-medium">CVE-2024-38472</div>
+        <div class="col-span-2 text-xs">Apache HTTP Server 2.4.57</div>
+        <div class="col-span-1 text-rose-400 font-mono">9.8</div>
+        <div class="col-span-1"><span class="badge-info text-xs px-1.5 py-0.5 rounded-full">Internet</span></div>
+        <div class="col-span-2 text-xs text-slate-400">MISP · CIRCL · TLP:AMBER</div>
+        <div class="col-span-1 text-xs">#sec-alerts<br><span class="text-slate-500">+ #web-infra</span></div>
+        <div class="col-span-1 text-xs text-slate-400">12 min ago</div>
+        <div class="col-span-1"><button onclick="toggleAck('alert-1')" class="text-xs px-2 py-1 rounded border border-slate-600 text-slate-400 hover:bg-slate-700">Ack</button></div>
+      </div>
+      <!-- Row 2 - Critical -->
+      <div class="grid grid-cols-12 gap-3 px-4 py-3 text-sm row-hover border-b border-slate-800 items-center" id="alert-2">
+        <div class="col-span-1"><span class="badge-crit text-xs px-2 py-0.5 rounded-full">CRIT</span></div>
+        <div class="col-span-2 font-medium">CVE-2024-28941</div>
+        <div class="col-span-2 text-xs">Windows Server 2022</div>
+        <div class="col-span-1 text-rose-400 font-mono">9.1</div>
+        <div class="col-span-1"><span class="badge-info text-xs px-1.5 py-0.5 rounded-full">Internet</span></div>
+        <div class="col-span-2 text-xs text-slate-400">MISP · NCSC-NL · TLP:AMBER</div>
+        <div class="col-span-1 text-xs">#sec-alerts<br><span class="text-slate-500">+ #infra</span></div>
+        <div class="col-span-1 text-xs text-slate-400">23 min ago</div>
+        <div class="col-span-1"><button onclick="toggleAck('alert-2')" class="text-xs px-2 py-1 rounded border border-slate-600 text-slate-400 hover:bg-slate-700">Ack</button></div>
+      </div>
+      <!-- Row 3 - Critical -->
+      <div class="grid grid-cols-12 gap-3 px-4 py-3 text-sm row-hover border-b border-slate-800 items-center" id="alert-3">
+        <div class="col-span-1"><span class="badge-crit text-xs px-2 py-0.5 rounded-full">CRIT</span></div>
+        <div class="col-span-2 font-medium">CVE-2024-31245</div>
+        <div class="col-span-2 text-xs">SAP NetWeaver 7.5 SPS22</div>
+        <div class="col-span-1 text-rose-400 font-mono">9.6</div>
+        <div class="col-span-1"><span class="badge-info text-xs px-1.5 py-0.5 rounded-full">Internet</span></div>
+        <div class="col-span-2 text-xs text-slate-400">MISP · BSI · TLP:AMBER</div>
+        <div class="col-span-1 text-xs">#sec-alerts<br><span class="text-slate-500">+ #sap-team</span></div>
+        <div class="col-span-1 text-xs text-slate-400">1 hr ago</div>
+        <div class="col-span-1"><button onclick="toggleAck('alert-3')" class="text-xs px-2 py-1 rounded border border-slate-600 text-slate-400 hover:bg-slate-700">Ack</button></div>
+      </div>
+      <!-- Row 4 - High -->
+      <div class="grid grid-cols-12 gap-3 px-4 py-3 text-sm row-hover border-b border-slate-800 items-center">
+        <div class="col-span-1"><span class="badge-high text-xs px-2 py-0.5 rounded-full">HIGH</span></div>
+        <div class="col-span-2 font-medium">CVE-2024-27318</div>
+        <div class="col-span-2 text-xs">PostgreSQL 15.3</div>
+        <div class="col-span-1 text-amber-400 font-mono">8.2</div>
+        <div class="col-span-1">—</div>
+        <div class="col-span-2 text-xs text-slate-400">MISP · CVE · TLP:WHITE</div>
+        <div class="col-span-1 text-xs">#it-ops</div>
+        <div class="col-span-1 text-xs text-slate-400">45 min ago</div>
+        <div class="col-span-1"><button class="text-xs px-2 py-1 rounded border border-slate-600 text-slate-400 hover:bg-slate-700">Ack</button></div>
+      </div>
+      <!-- Row 5 - High -->
+      <div class="grid grid-cols-12 gap-3 px-4 py-3 text-sm row-hover border-b border-slate-800 items-center">
+        <div class="col-span-1"><span class="badge-high text-xs px-2 py-0.5 rounded-full">HIGH</span></div>
+        <div class="col-span-2 font-medium">CVE-2024-22158</div>
+        <div class="col-span-2 text-xs">Jenkins 2.440</div>
+        <div class="col-span-1 text-amber-400 font-mono">7.5</div>
+        <div class="col-span-1">—</div>
+        <div class="col-span-2 text-xs text-slate-400">MISP · GitHub · TLP:WHITE</div>
+        <div class="col-span-1 text-xs">#devops</div>
+        <div class="col-span-1 text-xs text-slate-400">2 hr ago</div>
+        <div class="col-span-1"><button class="text-xs px-2 py-1 rounded border border-slate-600 text-slate-400 hover:bg-slate-700">Ack</button></div>
+      </div>
+      <!-- Row 6 - High, already acknowledged -->
+      <div class="grid grid-cols-12 gap-3 px-4 py-3 text-sm row-hover border-b border-slate-800 items-center opacity-50">
+        <div class="col-span-1"><span class="badge-high text-xs px-2 py-0.5 rounded-full">HIGH</span></div>
+        <div class="col-span-2 font-medium line-through">CVE-2024-19352</div>
+        <div class="col-span-2 text-xs">VMware vCenter 8.0</div>
+        <div class="col-span-1 text-amber-400 font-mono">7.8</div>
+        <div class="col-span-1">—</div>
+        <div class="col-span-2 text-xs text-slate-400">MISP · CVE · TLP:WHITE</div>
+        <div class="col-span-1 text-xs">#infra</div>
+        <div class="col-span-1 text-xs text-slate-400">3 hr ago</div>
+        <div class="col-span-1"><span class="text-xs text-emerald-400">✓ Ack'd</span></div>
+      </div>
+      <!-- Row 7 - Medium -->
+      <div class="grid grid-cols-12 gap-3 px-4 py-3 text-sm row-hover border-b border-slate-800 items-center">
+        <div class="col-span-1"><span class="badge-med text-xs px-2 py-0.5 rounded-full">MED</span></div>
+        <div class="col-span-2 font-medium">CVE-2024-10582</div>
+        <div class="col-span-2 text-xs">nginx 1.24.0</div>
+        <div class="col-span-1 text-yellow-400 font-mono">5.9</div>
+        <div class="col-span-1"><span class="badge-info text-xs px-1.5 py-0.5 rounded-full">Internet</span></div>
+        <div class="col-span-2 text-xs text-slate-400">MISP · CVE · TLP:WHITE</div>
+        <div class="col-span-1 text-xs">#web-ops</div>
+        <div class="col-span-1 text-xs text-slate-400">4 hr ago</div>
+        <div class="col-span-1"><button class="text-xs px-2 py-1 rounded border border-slate-600 text-slate-400 hover:bg-slate-700">Ack</button></div>
+      </div>
+      <!-- Row 8 - Low -->
+      <div class="grid grid-cols-12 gap-3 px-4 py-3 text-sm row-hover items-center">
+        <div class="col-span-1"><span class="badge-low text-xs px-2 py-0.5 rounded-full">LOW</span></div>
+        <div class="col-span-2 font-medium">CVE-2024-08733</div>
+        <div class="col-span-2 text-xs">Confluence 8.5</div>
+        <div class="col-span-1 text-slate-400 font-mono">3.1</div>
+        <div class="col-span-1">—</div>
+        <div class="col-span-2 text-xs text-slate-400">MISP · CVE · TLP:WHITE</div>
+        <div class="col-span-1 text-xs">— (logged only)</div>
+        <div class="col-span-1 text-xs text-slate-400">6 hr ago</div>
+        <div class="col-span-1"><button class="text-xs px-2 py-1 rounded border border-slate-600 text-slate-400 hover:bg-slate-700">Ack</button></div>
+      </div>
+    </div>
+
+    <!-- Detail Panel Trigger -->
+    <div class="text-xs text-slate-500 mt-3">Click any row to expand details · Showing 8 of 66 alerts</div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-bold">⚙ Settings</h2>
+        <button onclick="document.getElementById('settings-modal').classList.remove('active')" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+      <div class="space-y-3 text-sm">
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">MISP URL</label>
+          <input class="w-full px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm" value="https://misp.company.com">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Pull Interval</label>
+          <select class="w-full px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm">
+            <option>Every 5 minutes</option>
+            <option selected>Every 15 minutes</option>
+            <option>Every hour</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Slack Webhook URL</label>
+          <input class="w-full px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm" value="https://hooks.slack.com/services/T...">
+        </div>
+        <div class="flex gap-3 mt-4">
+          <button class="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-medium">Save</button>
+          <button onclick="document.getElementById('settings-modal').classList.remove('active')" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleAck(id) {
+      const el = document.getElementById(id);
+      el.classList.toggle('opacity-50');
+      const btn = el.querySelector('button');
+      if (el.classList.contains('opacity-50')) {
+        el.querySelector('.col-span-1:last-child').innerHTML = '<span class="text-xs text-emerald-400">✓ Ack\'d</span>';
+      } else {
+        el.querySelector('.col-span-1:last-child').innerHTML = '<button onclick="toggleAck(\''+id+'\')" class="text-xs px-2 py-1 rounded border border-slate-600 text-slate-400 hover:bg-slate-700">Ack</button>';
+      }
+    }
+  </script>
+</body>
+</html>

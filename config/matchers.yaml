@@ -1,0 +1,23 @@
+# threatlib — Matchers Configuration
+matchers:
+  - name: CVEMatcher
+    enabled: true
+    description: "Cross-references CVE IDs against organisation tech stack with version-aware comparison"
+    config:
+      alias_map: builtin
+
+  - name: SectorMatcher
+    enabled: true
+    description: "Checks event tags against sector taxonomies and cross-references org profile"
+    config:
+      taxonomies:
+        - eu-nis-sector-and-subsectors
+        - dhs-ciip-sectors
+        - nis2
+        - targeted-threat-index
+
+  - name: KEVMatcher
+    enabled: true
+    description: "Checks if any CVE in the event appears in the CISA KEV catalog"
+    config:
+      cache_duration: 24h

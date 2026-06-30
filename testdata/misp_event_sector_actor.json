@@ -1,0 +1,105 @@
+{
+  "note": "This event has NO CVE — it's a threat actor / campaign intelligence report. The SectorMatcher should catch it.",
+  "response": [
+    {
+      "Event": {
+        "id": "1003",
+        "orgc_id": "1",
+        "org_id": "1",
+        "date": "2024-07-08",
+        "threat_level_id": "2",
+        "info": "APT41 Targeting Semiconductor Manufacturing — Campaign Report",
+        "published": true,
+        "uuid": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+        "attribute_count": "2",
+        "analysis": "2",
+        "timestamp": "1720443600",
+        "distribution": "3",
+        "sharing_group_id": "0",
+        "Org": {
+          "id": "5",
+          "name": "NCSC-NL",
+          "uuid": "ncsc-nl-org-uuid"
+        },
+        "Orgc": {
+          "id": "5",
+          "name": "NCSC-NL",
+          "uuid": "ncsc-nl-org-uuid"
+        },
+        "Tag": [
+          {
+            "id": "107",
+            "name": "tlp:amber",
+            "colour": "#FFA500",
+            "exportable": true
+          },
+          {
+            "id": "108",
+            "name": "eu-nis-oes:eu-nis-oes-manufacturing",
+            "colour": "#0000FF",
+            "exportable": true
+          },
+          {
+            "id": "109",
+            "name": "targeted-threat-index:targets-manufacturing",
+            "colour": "#FF0000",
+            "exportable": true
+          }
+        ],
+        "Attribute": [
+          {
+            "id": "10006",
+            "event_id": "1003",
+            "category": "Attribution",
+            "type": "threat-actor",
+            "value1": "APT41",
+            "value2": "",
+            "to_ids": false,
+            "uuid": "attr-uuid-10006",
+            "timestamp": "1720443600",
+            "distribution": "5",
+            "comment": "Chinese state-sponsored group actively targeting semiconductor fabs",
+            "deleted": false
+          },
+          {
+            "id": "10007",
+            "event_id": "1003",
+            "category": "Targeting data",
+            "type": "comment",
+            "value1": "APT41 has shifted focus to semiconductor manufacturing targets in Europe and Asia. Spear-phishing campaigns observed against engineering staff at EU-based fabs.",
+            "value2": "",
+            "to_ids": false,
+            "uuid": "attr-uuid-10007",
+            "timestamp": "1720443600",
+            "distribution": "5",
+            "comment": "Campaign description",
+            "deleted": false
+          }
+        ],
+        "Object": [],
+        "Galaxy": [
+          {
+            "id": "302",
+            "uuid": "galaxy-uuid-302",
+            "name": "Threat Actor",
+            "type": "threat-actor",
+            "GalaxyCluster": [
+              {
+                "id": "402",
+                "uuid": "cluster-uuid-402",
+                "type": "threat-actor",
+                "value": "APT41",
+                "tag_name": "misp-galaxy:threat-actor=\"APT41\"",
+                "description": "Chinese state-sponsored threat actor targeting manufacturing and semiconductor sectors",
+                "source": "MISP Project",
+                "authors": ["CIRCL"],
+                "version": "1.0"
+              }
+            ]
+          }
+        ],
+        "Sighting": []
+      }
+    }
+  ]
+}
