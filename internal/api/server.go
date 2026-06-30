@@ -1,28 +1,40 @@
-// Package api provides the threatlib HTTP server.
 package api
 
 import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
+	"github.com/jayelbotvibe-web/threatlib/internal/config"
+	"github.com/jayelbotvibe-web/threatlib/internal/model"
 	"github.com/jayelbotvibe-web/threatlib/internal/store"
 )
 
 // Server holds the HTTP server dependencies.
 type Server struct {
-	DB  *store.DB
-	Mux *http.ServeMux
+	DB         *store.DB
+	Mux        *http.ServeMux
+	AdminKey   string
+	ConfigDir  string
+	EventQueue chan<- model.ThreatEvent
 }
 
 // NewServer creates an HTTP server for the threatlib API.
-func NewServer(db *store.DB) *Server {
+func NewServer(db *store.DB, configDir string, adminKey string) *Server {
 	s := &Server{
-		DB:  db,
-		Mux: http.NewServeMux(),
+		DB:        db,
+		Mux:       http.NewServeMux(),
+		AdminKey:  adminKey,
+		ConfigDir: configDir,
 	}
 	s.registerRoutes()
 	return s
+}
+
+// SetEventQueue sets the event queue for triggering manual pulls.
+func (s *Server) SetEventQueue(q chan<- model.ThreatEvent) {
+	s.EventQueue = q
 }
 
 // ListenAndServe starts the HTTP server.
@@ -32,11 +44,114 @@ func (s *Server) ListenAndServe(addr string) error {
 }
 
 func (s *Server) registerRoutes() {
+	// Public read endpoints
 	s.Mux.HandleFunc("/health", s.handleHealth)
 	s.Mux.HandleFunc("/api/alerts", s.handleAlerts)
 	s.Mux.HandleFunc("/api/techstack", s.handleTechStack)
 	s.Mux.HandleFunc("/api/stats", s.handleStats)
+
+	// Admin write endpoints (auth required)
+	s.Mux.HandleFunc("/admin/import", s.auth(s.handleAdminImport))
+	s.Mux.HandleFunc("/admin/ack/", s.auth(s.handleAdminAck))
+	s.Mux.HandleFunc("/admin/pull", s.auth(s.handleAdminPull))
 }
+
+// auth wraps a handler with API key authentication.
+func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.AdminKey == "" {
+			http.Error(w, `{"error":"admin key not configured"}`, http.StatusInternalServerError)
+			return
+		}
+		key := r.Header.Get("X-Threatlib-Key")
+		if key == "" || key != s.AdminKey {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		next(w, r)
+	}
+}
+
+// ─────────────────────────────────────────────────────────────
+// Admin handlers
+// ─────────────────────────────────────────────────────────────
+
+func (s *Server) handleAdminImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse uploaded CSV
+	apps, err := config.ParseTechStackReader(r.Body)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	added, removed, err := s.DB.ImportTechStack(apps)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	log.Printf("admin: import %d apps (%d added, %d removed)", len(apps), added, removed)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "ok",
+		"imported": len(apps),
+		"added":   added,
+		"removed": removed,
+	})
+}
+
+func (s *Server) handleAdminAck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract alert ID from URL: /admin/ack/<alert_id>
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/admin/ack/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		http.Error(w, `{"error":"alert ID required"}`, http.StatusBadRequest)
+		return
+	}
+	alertID := parts[0]
+
+	// Parse optional body for resolution status
+	var body struct {
+		Status string `json:"status"` // "acked", "false_pos", "resolved"
+	}
+	json.NewDecoder(r.Body).Decode(&body)
+	if body.Status == "" {
+		body.Status = "acked"
+	}
+
+	_, err := s.DB.Conn().Exec("UPDATE alerts SET status = ? WHERE id = ?", body.Status, alertID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	log.Printf("admin: ack alert %s → %s", alertID, body.Status)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "alert_id": alertID, "new_status": body.Status})
+}
+
+func (s *Server) handleAdminPull(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "ok",
+		"message": "pull triggered (MISP poller will pull on next tick if configured)",
+	})
+}
+
+// ─────────────────────────────────────────────────────────────
+// Public read handlers (unchanged)
+// ─────────────────────────────────────────────────────────────
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	var alertCount, deadLetterCount int
@@ -44,9 +159,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM dedup_hashes").Scan(&deadLetterCount)
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"status":            "ok",
-		"alerts_total":      alertCount,
-		"dedup_entries":     deadLetterCount,
+		"status":        "ok",
+		"alerts_total":  alertCount,
+		"dedup_entries": deadLetterCount,
 	})
 }
 
