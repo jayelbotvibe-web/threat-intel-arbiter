@@ -2,6 +2,7 @@
 package source
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,7 +27,12 @@ func NewMISPClient(baseURL, apiKey string) *MISPClient {
 	return &MISPClient{
 		BaseURL: strings.TrimRight(baseURL, "/"),
 		APIKey:  apiKey,
-		HTTP:    &http.Client{Timeout: 30 * time.Second},
+		HTTP: &http.Client{
+			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		},
 	}
 }
 
