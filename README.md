@@ -6,7 +6,11 @@ Threat Intel Arbiter transforms raw threat intelligence into organisation-specif
 
 > **Should this organisation care about this threat right now?**
 
-Every alert includes: **Severity** + **Confidence** + **Explanation** with full score breakdown.
+Every alert includes: **Severity** + **Confidence** + **Action** + **Explanation** with full score breakdown.
+
+**SSVC action labels** tell you what to do: Act Now / Schedule / Track / Monitor.
+**Threat tagging** enriches events with ATT&CK techniques + threat actors (offline, zero deps).
+**Per-source confidence** shows which sources contributed to the score.
 
 ---
 
@@ -51,11 +55,11 @@ Threat Intel Arbiter is entirely configuration-driven. No database UI needed.
 | File | Purpose |
 |------|---------|
 | `config/techstack.csv` | Your application inventory (name, version, vendor, criticality, exposure) |
-| `config/sources.yaml` | Threat source connections (MISP URL, KEV enabled) |
-| `config/routing.yaml` | Alert routing rules (severity + confidence → Slack/Teams/Email) |
-| `config/risk.yaml` | Risk dimension weights and thresholds |
-| `config/matchers.yaml` | Enabled matchers and their config |
-| `config/org.yaml` | Organisation profile (sector, country, timezone) |
+| `config/sources.json` | Threat source connections (MISP URL, KEV enabled) |
+| `config/routing.json` | Alert routing rules (severity + confidence → Slack/Teams/Email) |
+| `config/risk.json` | Risk dimension weights and thresholds |
+| `config/matchers.json` | Enabled matchers and their config |
+| `config/org.json` | Organisation profile (sector, country, timezone) |
 
 ---
 
