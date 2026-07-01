@@ -4,7 +4,7 @@
       "id": "misp-primary",
       "type": "misp",
       "name": "NanoFab MISP",
-      "url": "http://172.16.146.129",
+      "url": "https://172.16.146.129",
       "auth_key_env": "MISP_API_KEY",
       "confidence": "high",
       "enabled": true,
