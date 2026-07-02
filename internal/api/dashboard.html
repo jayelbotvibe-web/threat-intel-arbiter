@@ -384,7 +384,7 @@ function render() {
     return '<div class="row '+esc(sev)+' '+(i===cursor?'sel':'')+'" data-id="'+esc(a.id)+'" onclick="openDrawer(\''+esc(a.id)+'\')">'+
       '<div><span class="action a-'+(a.ssvc_action||'track')+'"><span class="adot"></span>'+esc(actionLabel[a.ssvc_action]||'Track')+'</span></div>'+
       '<div class="who"><div class="line1"><span class="cve mono">'+esc(a.cve||a.event_id)+'</span><span class="title">'+esc(a._title||'')+'</span></div>'+
-      '<div class="line2">'+appChips+flags+'</div></div>'+
+      '<div class="line2">'+appChips+flags+'<span class="flag" style="color:var(--accent);background:var(--accent-soft);border:1px solid rgba(110,121,255,0.25)">'+esc(a._source||'')+'</span></div></div>'+
       '<div class="score"><div class="stop"><span class="sval">'+score.toFixed(2)+'</span><span class="slab">'+(a.confidence||'').toLowerCase()+'</span></div>'+
       '<div class="bar"><i style="width:'+barW+'%"></i></div></div>'+
       '<div><div class="when">'+esc(ago(a.created_at))+'<div class="abs">'+esc(absTime(a.created_at))+'</div></div>'+
@@ -421,7 +421,7 @@ function openDrawer(id) {
         (apps.length?'':'<span style="color:var(--faint)">None</span>')+'</div></div>'+
       '<div class="block"><h4>Signals</h4><div class="line2">'+(flags||'<span style="color:var(--faint);font-size:11px">No enrichment signals</span>')+'</div></div>'+
       '<div class="block"><h4>Provenance</h4>'+
-        '<div class="kv"><span class="kk">Event ID</span><span class="vv mono">'+esc(a.event_id||'')+'</span></div>'+
+        '<div class="kv"><span class="kk">Source</span><span class="vv">'+(a._source||'')+'</span></div>'+
         '<div class="kv"><span class="kk">Severity</span><span class="vv">'+esc(a.severity||'')+'</span></div>'+
         '<div class="kv"><span class="kk">First seen</span><span class="vv">'+esc(absTime(a.created_at))+'</span></div>'+
       '</div></div>'+
@@ -495,6 +495,7 @@ async function refreshAll() {
       a.cve = a.cve || parseCVE(a.event_id);
       a._title = parseTitle(a.explanation);
       a._flags = parseFlags(a.explanation);
+      a._source = (a.event_id||'').startsWith('CVE-') ? 'KEV' : 'MISP';
       return a;
     });
   }
