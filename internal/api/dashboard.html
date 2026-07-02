@@ -168,10 +168,12 @@
   <!-- SETTINGS (admin only) — modal -->
   <div class="modal-overlay" id="settings-modal">
     <div class="modal-box" style="max-width:640px">
-    <div class="settings-nav" id="settingsNav">
+    <div class="settings-nav" id="settingsNav" style="display:flex;align-items:center">
       <button class="stab active" data-stab="users">Users</button>
       <button class="stab" data-stab="apikey">API & Webhooks</button>
       <button class="stab" data-stab="status">System Status</button>
+      <span style="flex:1"></span>
+      <button class="btn" onclick="document.getElementById('settings-modal').classList.remove('active')" style="font-size:16px;padding:2px 8px">✕</button>
     </div>
 
     <!-- Users sub-panel -->
