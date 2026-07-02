@@ -326,7 +326,6 @@ function parseTitle(ex) { var ln = (ex||'').split('\n').find(l => l.trim() && l.
 function parseApps(raw) { try { return JSON.parse(raw); } catch(e) { return (raw||'').replace(/[\[\]"]/g,'').split(',').filter(Boolean); } }
 function parseFlags(ex) {
   var f = []; var lower = (ex||'').toLowerCase();
-  if (lower.includes('kev') || lower.includes('cisa')) f.push({t:'kev',l:'KEV'});
   if (lower.includes('exploited') || lower.includes('in the wild') || lower.includes('ransomware')) f.push({t:'exploited',l:'Exploited'});
   if (lower.includes('threat actor') || lower.includes('apt')) f.push({t:'actor',l:'Actor'});
   return f;
