@@ -337,6 +337,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"last_misp_pull":   lastPull,
 		"kev_entries":      kevCount,
 		"dedup_entries":    deadLetterCount,
+		"cs_mock":          os.Getenv("CROWDSTRIKE_CLIENT_ID") == "",
 	})
 }
 
