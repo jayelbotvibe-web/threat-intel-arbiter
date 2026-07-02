@@ -129,6 +129,8 @@ NVD-only would produce a thinner product indistinguishable from a CVSS filter. M
 
 Built-in single-page application — no framework, no build step, pure HTML/CSS/JS served from the binary.
 
+![Dashboard Screenshot](docs/dashboard-screenshot.jpg)
+
 | Screen | Description |
 |---|---|
 | **Alerts** | Searchable/filterable table. Click any row for full risk breakdown with explanation, CVSS, matched apps, and action labels. |
