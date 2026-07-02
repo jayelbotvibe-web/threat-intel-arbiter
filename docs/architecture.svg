@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1125 1060" width="1125" height="1060">
-  <rect width="100%" height="100%" fill="#020617"/>
-  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
-  </pattern>
-  <rect width="100%" height="100%" fill="url(#grid)"/>
-  
-        <defs>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+    </pattern>
+
           <marker id="a-sl" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/></marker>
           <marker id="a-em" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/></marker>
           <marker id="a-am" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/></marker>
@@ -15,7 +13,10 @@
           <marker id="a-or" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#fb923c"/></marker>
           <marker id="a-bl" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/></marker>
           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern>
-        </defs>
+        
+  </defs>
+  <rect width="1125" height="1060" fill="url(#grid)"/>
+
 
         <rect width="100%" height="100%" fill="url(#grid)"/>
 
@@ -373,5 +374,5 @@
 
         <line x1="790" y1="770" x2="804" y2="770" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,3"/>
         <text x="812" y="772" fill="#94a3b8" font-size="8">Dead letter / failure</text>
-      </svg>
+      
 </svg>
