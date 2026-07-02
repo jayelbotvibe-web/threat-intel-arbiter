@@ -244,6 +244,17 @@ func NormalizeMISPEvent(raw MISPEvent) model.ThreatEvent {
 		if attr.Type == "link" {
 			event.References = append(event.References, attr.Value)
 		}
+		// Extract IOCs for EDR integration
+		iocType := mapMISPToIOCType(attr.Type)
+		if iocType != "" && attr.Value != "" {
+			event.IOCs = append(event.IOCs, model.IOC{
+				Type:        iocType,
+				Value:       attr.Value,
+				Description: raw.Info,
+				Source:      "misp",
+				Tags:        eventTags(attr.Tags),
+			})
+		}
 	}
 
 	// Extract tags
@@ -305,4 +316,31 @@ func parseCVSS(s string) (float64, error) {
 		return 0, err
 	}
 	return score, nil
+}
+
+// mapMISPToIOCType maps a MISP attribute type to an IOC type for EDR integration.
+func mapMISPToIOCType(mispType string) model.IOCType {
+	switch mispType {
+	case "ip-src", "ip-dst", "ip":
+		return model.IOCIPv4
+	case "ipv6":
+		return model.IOCIPv6
+	case "domain", "hostname":
+		return model.IOCDomain
+	case "sha256":
+		return model.IOCHashSHA256
+	case "md5":
+		return model.IOCHashMD5
+	default:
+		return ""
+	}
+}
+
+// eventTags extracts tag names from MISP attribute tags.
+func eventTags(tags []MISPEventTag) []string {
+	out := make([]string, len(tags))
+	for i, t := range tags {
+		out[i] = t.Name
+	}
+	return out
 }

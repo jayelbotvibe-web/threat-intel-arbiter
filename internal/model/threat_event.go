@@ -20,6 +20,7 @@ type ThreatEvent struct {
 	AffectedProducts []AffectedProduct `json:"affected_products"`
 	ThreatActors     []string          `json:"threat_actors"`
 	References       []string          `json:"references"`
+	IOCs             []IOC             `json:"iocs,omitempty"`
 }
 
 // AffectedProduct describes a product affected by a threat.
@@ -86,4 +87,25 @@ type Alert struct {
 	MatchedApps []string `json:"matched_apps"`
 	RoutedTo    []string `json:"routed_to"`
 	CreatedAt   string   `json:"created_at"`
+}
+
+// IOCType represents the supported indicator types for EDR integration.
+type IOCType string
+
+const (
+	IOCIPv4       IOCType = "ipv4"
+	IOCIPv6       IOCType = "ipv6"
+	IOCDomain     IOCType = "domain"
+	IOCHashSHA256 IOCType = "hash_sha256"
+	IOCHashMD5    IOCType = "hash_md5"
+)
+
+// IOC represents an indicator of compromise extracted from a threat event.
+type IOC struct {
+	Type        IOCType `json:"type"`
+	Value       string  `json:"value"`
+	Description string  `json:"description"`
+	Severity    string  `json:"severity"`
+	Source      string  `json:"source"`
+	Tags        []string `json:"tags,omitempty"`
 }
