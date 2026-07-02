@@ -29,12 +29,12 @@ Every alert includes: **Severity** + **Confidence** + **Action** + **Explanation
 ```
 
 1. **Pull** — fetches ALL events from MISP (no galaxy/tag/CVE pre-filter). MISP acts as an aggregation channel for peers, ISACs, OSINT feeds, commercial, and government sources. Filtering happens locally against your context.
-2. **Normalize** — extracts CVEs, CVSS, tags, threat actors. Deliberately ignores raw IOCs (IPs, hashes, domains). Canonical ThreatEvent model is source-agnostic.
+2. **Normalize** — extracts CVEs, CVSS, tags, threat actors, references, AND IOCs (IPs, domains, hashes) for EDR integration. Canonical ThreatEvent model is source-agnostic.
 3. **Filter** — drops TLP:RED, disputed CVEs, known false positives via MISP warning lists.
 4. **Match** — pluggable matchers: CVEMatcher (version-aware), SectorMatcher (taxonomy tags), KEVMatcher (active exploitation).
-5. **Score** — 4 dimensions: Likelihood × Impact × Exposure ÷ max, with Confidence as a separate dimension. Raw-points/max-points formula preserves zero-sensitivity without collapse.
+5. **Score** — 4 dimensions: Likelihood × Impact × Exposure ÷ max, with Confidence as a separate dimension. Raw-points/max-points formula with exposure baseline to prevent internal threats from collapsing to zero.
 6. **Explain** — human-readable breakdown from the same struct that computed the score. No separate code path.
-7. **Route** — by severity + confidence. Critical+high → #sec-alerts. Medium → weekly digest. Low → log only. 3× retry with exponential backoff, dead letter on failure.
+7. **Route** — by severity + confidence. Critical+high → #sec-alerts. Medium → weekly digest. Low → log only. IOCs → Crowdstrike Falcon EDR (mock-first, OAuth2, dedup, batching).
 8. **Feedback** — false positives marked by analysts feed back into risk calibration. The moat: months of operational data produce tuning a competitor can't replicate.
 
 ---
@@ -351,7 +351,8 @@ threat-intel-arbiter/
 │   ├── filter/                  # Warning list filter
 │   ├── match/                   # CVEMatcher, SectorMatcher, KEVMatcher + version subsystem
 │   ├── risk/                    # 4-dim scoring + explainability + dedup
-│   ├── notify/                  # Slack, Teams, Email, Webhook routers
+│   ├── notify/                  # Slack, Teams, Email, Webhook, Crowdstrike routers
+│   │   └── crowdstrike.go        # OAuth2, IOC batching/dedup, mock mode
 │   ├── api/                     # HTTP server, auth, dashboard
 │   │   ├── server.go
 │   │   ├── auth.go              # Login, sessions, middleware
@@ -369,6 +370,15 @@ threat-intel-arbiter/
 │   └── architecture.html        # Interactive SVG diagram
 └── data/                        # SQLite database (created at runtime)
 ```
+
+### Changelog
+
+- **Jul 2026** — Crowdstrike Falcon EDR integration: IOC extraction from MISP attributes, OAuth2 auth, batching (30s/100), dedup, mock mode, EDR health dot
+- **Jul 2026** — Security hardening: Argon2id password hashing, session token hashing, XSS fixes, CSP headers, login rate limiting, username enumeration fix, TRUSTED_PROXY flag, MISP pagination fix, cursor skip fix, freshness scoring fix
+- **Jul 2026** — SSVC triage console: action cards, severity-colored rows, side drawer, keyboard shortcuts (j/k/enter/a/f/r), Inter + JetBrains Mono fonts
+- **Jul 2026** — Multi-user auth: admin/reader roles, session cookies, password management, login page
+- **Jul 2026** — GitHub Pages: architecture diagram, SVG/PNG exports, design document
+- **Jun 2026** — Initial release: KEV + MISP ingestion, CVEMatcher, risk scoring, Slack/Teams/Email routing
 
 ---
 
