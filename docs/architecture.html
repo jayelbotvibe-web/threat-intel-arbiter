@@ -125,8 +125,8 @@
         <!-- Normalizers -->
         <rect x="490" y="196" width="242" height="78" rx="6" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.2"/>
         <text x="611" y="216" fill="white" font-size="9" font-weight="600" text-anchor="middle">Normalization Layer</text>
-        <text x="611" y="234" fill="#94a3b8" font-size="7.5" text-anchor="middle">Extracts: CVEs · CVSS · tags · actors · refs</text>
-        <text x="611" y="250" fill="#475569" font-size="7" text-anchor="middle">Ignores: raw IOCs (IPs, hashes, domains)</text>
+        <text x="611" y="234" fill="#94a3b8" font-size="7.5" text-anchor="middle">Extracts: CVEs · CVSS · tags · actors · refs · IOCs (IPs · domains · hashes)</text>
+        <text x="611" y="250" fill="#475569" font-size="7" text-anchor="middle">IOCs routed to EDR (Crowdstrike Falcon) — OAuth2 · batch · dedup</text>
         <text x="611" y="266" fill="#34d399" font-size="7.5" text-anchor="middle">Canonical ThreatEvent: source-agnostic</text>
 
         <!-- Warning Filter -->
@@ -347,6 +347,10 @@
 
         <line x1="732" y1="995" x2="776" y2="506" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a-sl)"/>
         <text x="752" y="760" fill="#fb7185" font-size="7" text-anchor="middle">3× fail</text>
+
+        <!-- EDR output -->
+        <line x1="732" y1="987" x2="776" y2="545" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#a-cy)"/>
+        <text x="754" y="805" fill="#f59e0b" font-size="7" text-anchor="middle">IOCs → Crowdstrike</text>
 
         <!-- Output → People -->
         <line x1="926" y1="222" x2="953" y2="222" stroke="#22d3ee" stroke-width="1" marker-end="url(#a-cy)"/>
