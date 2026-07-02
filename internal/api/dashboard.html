@@ -487,7 +487,7 @@ async function refreshAll() {
     document.getElementById('hMisp').className = 'dot' + (h.last_misp_pull?'':' warn');
     document.getElementById('hMispText').textContent = h.last_misp_pull ? 'MISP online' : 'MISP offline';
     document.getElementById('hKev').className = 'dot' + ((h.kev_entries||0)>0?'':' warn');
-    document.getElementById('hKevText').textContent = 'KEV '+(h.kev_entries||0);
+    document.getElementById('hKevText').textContent = 'KEV online';
   }
   var r = await api('/api/alerts');
   if (r && r.alerts) {
