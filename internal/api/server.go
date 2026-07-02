@@ -328,7 +328,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	s.DB.Conn().QueryRow("SELECT value FROM state WHERE key='misp_cursor'").Scan(&lastPull)
 
 	var kevCount int
-	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM events WHERE source_id='kev-primary'").Scan(&kevCount)
+	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM alerts WHERE event_id LIKE 'CVE-%'").Scan(&kevCount)
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":           "ok",
