@@ -134,7 +134,7 @@ func TestMISPClientFetchEvents(t *testing.T) {
 	defer srv.Close()
 
 	client := NewMISPClient(srv.URL, "test-api-key")
-	events, err := client.FetchEvents("", 100)
+	events, err := client.FetchEvents("", 100, 0)
 	if err != nil {
 		t.Fatalf("FetchEvents: %v", err)
 	}
@@ -454,7 +454,7 @@ func TestMISPClient_AuthFailure(t *testing.T) {
 
 	// Client with no API key
 	client := NewMISPClient(srv.URL, "")
-	_, err := client.FetchEvents("", 10)
+	_, err := client.FetchEvents("", 10, 0)
 	if err == nil {
 		t.Error("expected auth error, got nil")
 	}

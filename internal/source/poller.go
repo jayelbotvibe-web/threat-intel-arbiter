@@ -58,53 +58,59 @@ func (p *MISPPoller) poll(ctx context.Context) error {
 		log.Printf("misp poller: cold start, pulling events since %s", since)
 	}
 
-	events, err := p.Client.FetchEvents(since, 100)
-	if err != nil {
-		return fmt.Errorf("fetch events: %w", err)
-	}
-
-	log.Printf("misp poller: pulled %d events", len(events))
-
-	// Process each event: normalize, check for new/modified/deleted
-	for _, raw := range events {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		// Check if this event was already processed
-		normalized := NormalizeMISPEvent(raw)
-		existing, err := p.getStoredEvent(normalized.ID)
+	// Pagination loop: fetch up to 5 pages of 100 events each
+	totalPulled := 0
+	const maxPages = 5
+	for page := 0; page < maxPages; page++ {
+		events, err := p.Client.FetchEvents(since, 100, page)
 		if err != nil {
-			log.Printf("misp poller: check existing event %s: %v", normalized.ID, err)
-			continue
+			return fmt.Errorf("fetch events (page %d): %w", page, err)
 		}
-
-		if existing != nil && raw.Published == false {
-			// Event was deleted/unpublished — suppress
-			log.Printf("misp poller: event %s deleted, suppressing", normalized.ID)
-			p.storeEvent(normalized, true)
-			continue
+		if len(events) == 0 {
+			break
 		}
+		totalPulled += len(events)
+		log.Printf("misp poller: pulled %d events (page %d, total %d)", len(events), page, totalPulled)
 
-		if existing != nil && existing.Timestamp.After(normalized.Timestamp) {
-			// Already processed a newer version
-			continue
-		}
-
-		// NEW or MODIFIED event
-		p.storeEvent(normalized, false)
-
-		// Send to the event queue for matching
-		if p.Events != nil {
+		// Process each event: normalize, check for new/modified/deleted
+		for _, raw := range events {
 			select {
-			case p.Events <- normalized:
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				log.Printf("misp poller: event queue full, dropping event %s", normalized.ID)
 			}
+
+			normalized := NormalizeMISPEvent(raw)
+			existing, err := p.getStoredEvent(normalized.ID)
+			if err != nil {
+				log.Printf("misp poller: check existing event %s: %v", normalized.ID, err)
+				continue
+			}
+
+			if existing != nil && raw.Published == false {
+				log.Printf("misp poller: event %s deleted, suppressing", normalized.ID)
+				p.storeEvent(normalized, true)
+				continue
+			}
+
+			if existing != nil && existing.Timestamp.After(normalized.Timestamp) {
+				continue
+			}
+
+			p.storeEvent(normalized, false)
+			if p.Events != nil {
+				select {
+				case p.Events <- normalized:
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+					log.Printf("misp poller: event queue full, dropping event %s", normalized.ID)
+				}
+			}
+		}
+		// Stop paginating if this page had fewer than the limit
+		if len(events) < 100 {
+			break
 		}
 	}
 

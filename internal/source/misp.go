@@ -126,7 +126,7 @@ type MISPManifestEntry struct {
 
 // FetchEvents pulls events from the MISP REST API.
 // If since is set, only events modified after that timestamp are returned.
-func (c *MISPClient) FetchEvents(since string, limit int) ([]MISPEvent, error) {
+func (c *MISPClient) FetchEvents(since string, limit, page int) ([]MISPEvent, error) {
 	u, err := url.Parse(c.BaseURL + "/events/restSearch")
 	if err != nil {
 		return nil, fmt.Errorf("parse url: %w", err)
@@ -135,6 +135,7 @@ func (c *MISPClient) FetchEvents(since string, limit int) ([]MISPEvent, error) {
 	q := u.Query()
 	q.Set("returnFormat", "json")
 	q.Set("limit", fmt.Sprintf("%d", limit))
+	q.Set("page", fmt.Sprintf("%d", page+1)) // MISP pages are 1-indexed
 	if since != "" {
 		q.Set("timestamp", since)
 	}

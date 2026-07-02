@@ -54,7 +54,7 @@ export ARBITER_ADMIN_KEY="your-admin-key"
 ./arbiter --config ./config/
 ```
 
-Open **http://localhost:8080** — login with `admin` / `arbiter` (change immediately).
+Open **http://localhost:8080** — login with the username `admin` and the password printed to stdout on first start.
 
 ---
 
@@ -81,7 +81,7 @@ Multi-user with role-based access control:
 
 - Session cookie auth (HttpOnly, SameSite=Strict), 12-hour expiry
 - Password hashing: SHA-256 + 16-byte random salt (stdlib, zero deps)
-- Default admin seeded on first start: `admin` / `arbiter`
+- Default admin seeded on first start with random password (printed to stdout once)
 - Programmatic access via `X-Arbiter-Key` header (API key always has admin privileges)
 
 ---

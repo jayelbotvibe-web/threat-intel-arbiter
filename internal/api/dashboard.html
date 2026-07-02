@@ -271,7 +271,7 @@ function stBadge(s) {
 
 var allAlerts = [];
 async function refreshAll() {
-  const [stats, alerts, health] = await Promise.all([get('/api/stats'), get('/api/alerts'), get('/health')]);
+  const [stats, alerts, health] = await Promise.all([get('/api/stats'), get('/api/alerts'), get('/api/status')]);
   if (stats && stats.alerts) {
     document.getElementById('statCritical').textContent = stats.alerts.critical || 0;
     document.getElementById('statHigh').textContent = stats.alerts.high || 0;
@@ -344,7 +344,7 @@ async function showDetail(id) {
     <p class="mono" style="font-size:11px;color:#484f58;margin-bottom:8px">${r.event_id}</p>
     ${r.action ? '<p style="font-size:12px;font-weight:600;color:#f78166;margin-bottom:8px">Action: ' + r.action + '</p>' : ''}
     <p style="font-size:11px;color:#6e7681;margin-bottom:8px">Apps: ${(r.matched_apps||'').replace(/[\[\]"]/g,'') || 'none'} · ${stBadge(r.status)} · ${r.created_at}</p>
-    <div class="exp-block">${r.explanation || 'No explanation available.'}</div>`;
+    <div class="exp-block">${escapeHTML(r.explanation) || 'No explanation available.'}</div>`;
   document.getElementById('detail-modal').classList.add('active');
 }
 
@@ -543,13 +543,19 @@ function showConfirm(msg) {
 }
 
 function showToast(msg, ok) {
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.style.background = ok ? '#12171e' : '#12171e';
-  t.style.border = ok ? '1px solid rgba(63,185,80,0.3)' : '1px solid rgba(248,81,73,0.3)';
-  t.style.color = ok ? '#3fb950' : '#f85149';
-  t.textContent = msg; document.body.appendChild(t); setTimeout(function() { t.remove(); }, 3000);
-}
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.style.background = ok ? '#12171e' : '#12171e';
+      t.style.border = ok ? '1px solid rgba(63,185,80,0.3)' : '1px solid rgba(248,81,73,0.3)';
+      t.style.color = ok ? '#3fb950' : '#f85149';
+      t.textContent = msg; document.body.appendChild(t); setTimeout(function() { t.remove(); }, 3000);
+    }
+
+    // HTML-escape to prevent XSS from feed-derived content
+    function escapeHTML(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
 
 checkSession().then(function() { loadSettings(); refreshAll(); setInterval(refreshAll, 30000); });
 </script>

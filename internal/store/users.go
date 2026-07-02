@@ -3,10 +3,16 @@ package store
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"log"
+	"strings"
 	"time"
+
+	"golang.org/x/crypto/argon2"
 )
 
 // User represents a dashboard user account.
@@ -94,13 +100,14 @@ func (db *DB) VerifyPassword(username, password string) bool {
 
 // ─── Sessions ───
 
-// CreateSession generates a token and stores it with expiry.
+// CreateSession generates a token, stores its SHA-256 hash in DB, returns raw token for cookie.
 func (db *DB) CreateSession(username, role string) (string, error) {
 	token := generateToken()
+	tokenHash := sha256Hex(token)
 	expires := time.Now().Add(12 * time.Hour).Format(time.RFC3339)
 	_, err := db.conn.Exec(
 		"INSERT INTO sessions (token, username, role, expires_at) VALUES (?, ?, ?, ?)",
-		token, username, role, expires,
+		tokenHash, username, role, expires,
 	)
 	if err != nil {
 		return "", err
@@ -108,26 +115,28 @@ func (db *DB) CreateSession(username, role string) (string, error) {
 	return token, nil
 }
 
-// GetSession returns username+role for a valid token, or empty if expired/invalid.
+// GetSession looks up a session by hashing the raw token from the cookie.
 func (db *DB) GetSession(token string) (username, role string, ok bool) {
+	tokenHash := sha256Hex(token)
 	var expires string
 	err := db.conn.QueryRow(
-		"SELECT username, role, expires_at FROM sessions WHERE token = ?", token,
+		"SELECT username, role, expires_at FROM sessions WHERE token = ?", tokenHash,
 	).Scan(&username, &role, &expires)
 	if err != nil {
 		return "", "", false
 	}
 	exp, err := time.Parse(time.RFC3339, expires)
 	if err != nil || time.Now().After(exp) {
-		db.conn.Exec("DELETE FROM sessions WHERE token = ?", token)
+		db.conn.Exec("DELETE FROM sessions WHERE token = ?", tokenHash)
 		return "", "", false
 	}
 	return username, role, true
 }
 
-// DeleteSession removes a session token (logout).
+// DeleteSession removes a session by hashing the raw token.
 func (db *DB) DeleteSession(token string) {
-	db.conn.Exec("DELETE FROM sessions WHERE token = ?", token)
+	tokenHash := sha256Hex(token)
+	db.conn.Exec("DELETE FROM sessions WHERE token = ?", tokenHash)
 }
 
 // CleanExpiredSessions removes expired sessions.
@@ -135,16 +144,50 @@ func (db *DB) CleanExpiredSessions() {
 	db.conn.Exec("DELETE FROM sessions WHERE expires_at < ?", time.Now().Format(time.RFC3339))
 }
 
-// ─── Password hashing (stdlib: SHA-256 + random salt) ───
+// ─── Password hashing (Argon2id with legacy SHA-256 support) ───
+
+const (
+	argonTime    = 3
+	argonMemory  = 64 * 1024 // 64 MB
+	argonThreads = 4
+	argonKeyLen  = 32
+	argonPrefix  = "$argon2id$v=19$m=65536,t=3,p=4$"
+)
 
 func hashPassword(password string) string {
 	salt := make([]byte, 16)
 	rand.Read(salt)
-	h := sha256.Sum256(append(salt, []byte(password)...))
-	return hex.EncodeToString(salt) + ":" + hex.EncodeToString(h[:])
+	hash := argon2.IDKey([]byte(password), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
+	return argonPrefix + base64.RawStdEncoding.EncodeToString(salt) + "$" + base64.RawStdEncoding.EncodeToString(hash)
 }
 
 func verifyHash(password, stored string) bool {
+	if strings.HasPrefix(stored, "$argon2id$") {
+		return verifyArgon2(password, stored)
+	}
+	// Legacy SHA-256 hash
+	return verifyLegacy(password, stored)
+}
+
+func verifyArgon2(password, stored string) bool {
+	rest := strings.TrimPrefix(stored, argonPrefix)
+	parts := strings.SplitN(rest, "$", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	salt, err := base64.RawStdEncoding.DecodeString(parts[0])
+	if err != nil {
+		return false
+	}
+	expected, err := base64.RawStdEncoding.DecodeString(parts[1])
+	if err != nil {
+		return false
+	}
+	hash := argon2.IDKey([]byte(password), salt, argonTime, argonMemory, argonThreads, uint32(len(expected)))
+	return subtle.ConstantTimeCompare(hash, expected) == 1
+}
+
+func verifyLegacy(password, stored string) bool {
 	parts := splitN(stored, ":", 2)
 	if len(parts) != 2 {
 		return false
@@ -157,10 +200,25 @@ func verifyHash(password, stored string) bool {
 	return hex.EncodeToString(h[:]) == parts[1]
 }
 
+// IsLegacyHash returns true if the stored hash uses the old SHA-256 format.
+func IsLegacyHash(stored string) bool {
+	return !strings.HasPrefix(stored, "$argon2id$") && strings.Contains(stored, ":")
+}
+
+// RehashPassword re-hashes a password with Argon2id and returns the new hash.
+func RehashPassword(password string) string {
+	return hashPassword(password)
+}
+
 func generateToken() string {
 	b := make([]byte, 32)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+func sha256Hex(s string) string {
+	h := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(h[:])
 }
 
 func splitN(s, sep string, n int) []string {
@@ -188,12 +246,30 @@ func indexOf(s, sep string) int {
 }
 
 // seedDefaultAdmin creates the default admin user if no users exist.
+// Generates a random 16-character password printed once to stdout.
 func (db *DB) seedDefaultAdmin() error {
 	var count int
 	db.conn.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
 	if count > 0 {
 		return nil
 	}
-	// Default admin: admin / arbiter (user must change on first login)
-	return db.CreateUser("admin", "arbiter", "admin")
+	pw := randomPassword(16)
+	log.Printf("============================================================")
+	log.Printf("  FIRST RUN: default admin user created")
+	log.Printf("  Username: admin")
+	log.Printf("  Password: %s", pw)
+	log.Printf("  CHANGE THIS PASSWORD IMMEDIATELY via the Users panel")
+	log.Printf("  This message appears once — the password is NOT stored in logs")
+	log.Printf("============================================================")
+	return db.CreateUser("admin", pw, "admin")
+}
+
+func randomPassword(n int) string {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, n)
+	rand.Read(b)
+	for i := range b {
+		b[i] = chars[int(b[i])%len(chars)]
+	}
+	return string(b)
 }

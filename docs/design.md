@@ -393,7 +393,7 @@ risk_score = raw_score / max_score   (range: 0.0–1.0)
 
 The dimensions use their natural point scales. The denominator normalizes at the end. This preserves explainability — "Likelihood: 5.0/5.0" is clearer than "Likelihood: 0.83" — while keeping the math internally consistent.
 
-**Why not pure multiplicative?** Pure `a × b × c` with independent 0–1 factors is too aggressive. On a 0–1 scale: `0.6 × 0.6 × 0.6 = 0.216` (high) but `0.4 × 0.4 × 0.4 = 0.064` (low) — yet "moderate on all axes" is exactly the case you'd want as medium, not low. The raw-points-divided-by-max approach is a weighted product that preserves the zero-sensitivity (if any dimension is 0, score is 0) without the collapse problem.
+**Why not pure multiplicative?** Pure `a × b × c` with independent 0–1 factors is too aggressive. On a 0–1 scale: `0.6 × 0.6 × 0.6 = 0.216` (high) but `0.4 × 0.4 × 0.4 = 0.064` (low) — yet "moderate on all axes" is exactly the case you'd want as medium, not low. The raw-points-divided-by-max approach is a normalized product. A baseline of 1 is applied to exposure when any matcher fires, preventing internal-only threats from collapsing to zero.
 
 **⚠ Calibration note:** The thresholds below are initial values derived from heuristics, not empirical data. After deployment, they must be calibrated against production data using the false-positive feedback loop. The risk.yaml configuration file makes all weights and thresholds tunable without code changes.
 
@@ -504,9 +504,11 @@ The explanation is generated automatically from the same struct that produced th
 
 ### 8. Dedup + Suppression
 
-- Hash: `SHA256(CVE + app + source + tag_set)`
+- Hash: `SHA256(eventID + source + severity + riskScore + title)` — first 16 chars used as alert ID
 - 7-day TTL cache in SQLite
 - Same threat from 2 sources → 1 alert (dedup merges sources into the explanation)
+- MODIFIED events with changed title/severity create a new alert (changed threat = changed priority)
+- Tag changes do NOT trigger duplicates (tags are not in the hash)
 - Suppression reasons:
   - Event deleted at source
   - App removed from tech stack
@@ -824,7 +826,7 @@ go build -o arbiter ./cmd/arbiter/
 
 # Run
 export MISP_API_KEY="xxx"
-export THREATLIB_ADMIN_KEY="yyy"
+export ARBITER_ADMIN_KEY="yyy"
 export SMTP_PASSWORD="zzz"
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/..."
 
@@ -875,7 +877,7 @@ binary that runs in their existing environment is an easy yes.
 | Canonical ThreatEvent from day 1 | Adding a source later = 1 normalizer. Without this = rewrite engine. |
 | Sources table in migration 001 | Multi-source is the foundation, not a v2 feature. |
 | Matcher interface (pluggable) | Adding a matcher later = 1 file. Without this = modify engine. |
-| Raw-points / max-points formula (not pure multiplicative) | Preserves zero-sensitivity without the collapse problem. Internally consistent with explainability output. |
+|| Raw-points / max-points formula (not pure multiplicative) | Preserves proportional scoring without the collapse problem. Exposure baseline of 1 prevents internal threats from scoring zero. Internally consistent with explainability output. |
 | Confidence as first-class output, wired into routing | Routes "high severity, low confidence" differently from "high severity, high confidence." |
 | Explainability on every alert | Analyst trust requires transparency. Formula in explanation matches actual score computation. |
 | Version matching as subsystem with scheme detection | "7.5 SPS22" ≠ semver. Conservative matching for unrecognized schemes. |

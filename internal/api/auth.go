@@ -5,6 +5,9 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/store"
 )
 
 // ─── Auth handlers (public) ───
@@ -29,12 +32,39 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, err := s.DB.GetUser(body.Username)
+	if err != nil || user == nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
+		return
+	}
+
+	// Rate limiting: 10 attempts per 5 minutes per account, 20 per IP
+	ip := r.RemoteAddr
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		ip = strings.Split(fwd, ",")[0]
+	}
+	if !s.limiter.allow("user:"+body.Username, 10, 5*time.Minute) ||
+		!s.limiter.allow("ip:"+ip, 20, 5*time.Minute) {
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many attempts, try again later"})
+		return
+	}
+
 	if !s.DB.VerifyPassword(body.Username, body.Password) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 		return
 	}
 
-	user, _ := s.DB.GetUser(body.Username)
+	// Reset rate limit on successful login
+	s.limiter.reset("user:" + body.Username)
+	s.limiter.reset("ip:" + ip)
+
+	// Transparently upgrade legacy SHA-256 hashes to Argon2id
+	if store.IsLegacyHash(user.PasswordHash) {
+		newHash := store.RehashPassword(body.Password)
+		s.DB.Conn().Exec("UPDATE users SET password_hash = ? WHERE username = ?", newHash, user.Username)
+		log.Printf("auth: upgraded password hash for %s (SHA-256 → Argon2id)", user.Username)
+	}
+
 	token, err := s.DB.CreateSession(user.Username, user.Role)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "session error"})
@@ -46,6 +76,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   12 * 3600, // 12 hours
 	})

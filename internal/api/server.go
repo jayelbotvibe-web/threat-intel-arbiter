@@ -25,6 +25,7 @@ type Server struct {
 	AdminKey   string
 	ConfigDir  string
 	EventQueue chan<- model.ThreatEvent
+	limiter    *rateLimiter
 }
 
 // NewServer creates an HTTP server for the Threat Intel Arbiter API.
@@ -34,6 +35,7 @@ func NewServer(db *store.DB, configDir string, adminKey string) *Server {
 		Mux:       http.NewServeMux(),
 		AdminKey:  adminKey,
 		ConfigDir: configDir,
+		limiter:   newRateLimiter(),
 	}
 	s.registerRoutes()
 	return s
@@ -72,6 +74,7 @@ func (s *Server) registerRoutes() {
 	s.Mux.HandleFunc("/health", s.handleHealth)
 
 	// API endpoints (auth required)
+	s.Mux.HandleFunc("/api/status", s.requireAuth(s.handleStatus))
 	s.Mux.HandleFunc("/api/alerts", s.requireAuth(s.handleAlerts))
 	s.Mux.HandleFunc("/api/alerts/", s.requireAuth(s.handleAlertDetail))
 	s.Mux.HandleFunc("/api/techstack", s.requireAuth(s.handleTechStack))
@@ -271,16 +274,20 @@ func (s *Server) handleAdminTechStack(w http.ResponseWriter, r *http.Request) {
 // ─────────────────────────────────────────────────────────────
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	// Minimal public health — liveness only
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// handleStatus returns detailed system status (requires auth).
+func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	var alertCount, newAlerts, deadLetterCount int
 	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM alerts").Scan(&alertCount)
 	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM alerts WHERE status='new'").Scan(&newAlerts)
 	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM dedup_hashes").Scan(&deadLetterCount)
 
-	// Last MISP pull cursor
 	var lastPull string
 	s.DB.Conn().QueryRow("SELECT value FROM state WHERE key='misp_cursor'").Scan(&lastPull)
 
-	// KEV entries count
 	var kevCount int
 	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM events WHERE source_id='kev-primary'").Scan(&kevCount)
 
