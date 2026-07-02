@@ -43,8 +43,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
 		ip = strings.Split(fwd, ",")[0]
 	}
-	if !s.limiter.allow("user:"+body.Username, 10, 5*time.Minute) ||
-		!s.limiter.allow("ip:"+ip, 20, 5*time.Minute) {
+	if !s.limiter.allow("user:"+body.Username, 20, 5*time.Minute) ||
+		!s.limiter.allow("ip:"+ip, 50, 5*time.Minute) {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many attempts, try again later"})
 		return
 	}
