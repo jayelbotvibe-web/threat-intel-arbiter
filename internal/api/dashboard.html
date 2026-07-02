@@ -189,7 +189,7 @@
     <span class="spacer"></span>
     <div class="hstat"><span class="dot" id="hMisp"></span> <span id="hMispText">MISP</span></div>
     <div class="hstat"><span class="dot" id="hKev"></span> <span id="hKevText">KEV</span></div>
-    <div class="hstat"><span class="dot" id="hCS"></span> <span id="hCSText">Crowdstrike</span></div>
+    <div class="hstat"><span class="dot" id="hCS"></span> <span id="hCSText">EDR</span></div>
     <span class="user" id="headerUser"></span>
     <button class="iconbtn" title="Refresh" onclick="refreshAll()">↻</button>
     <button class="iconbtn admin-only" title="Settings" onclick="openSettings()">⚙</button>
@@ -291,7 +291,7 @@
       <input style="width:100%;margin-bottom:8px" id="teamsUrl" placeholder="https://…" onchange="saveWebhooks()">
       <label style="display:block;font-size:11px;color:var(--faint)">Email</label>
       <input style="width:100%" id="emailTarget" placeholder="soc@company.com" onchange="saveWebhooks()">
-      <h4 style="margin-bottom:8px;margin-top:16px">Crowdstrike Falcon</h4>
+      <h4 style="margin-bottom:8px;margin-top:16px">EDR — Crowdstrike Falcon</h4>
       <p style="font-size:10px;color:var(--faint);margin-bottom:6px">IOC integration — leave blank for mock mode</p>
       <label style="display:block;font-size:11px;color:var(--faint)">Client ID</label>
       <input style="width:100%;margin-bottom:8px" id="csClientId" placeholder="Client ID…" onchange="saveWebhooks()">
@@ -497,7 +497,7 @@ async function refreshAll() {
     document.getElementById('hKev').className = 'dot' + ((h.kev_entries||0)>0?'':' warn');
     document.getElementById('hKevText').textContent = 'KEV online';
     document.getElementById('hCS').className = 'dot' + ((h.cs_mock)!==false?' warn':'');
-    document.getElementById('hCSText').textContent = (h.cs_mock)!==false ? 'CS mock' : 'CS online';
+    document.getElementById('hCSText').textContent = (h.cs_mock)!==false ? 'EDR mock' : 'EDR online';
   }
   var r = await api('/api/alerts');
   if (r && r.alerts) {
