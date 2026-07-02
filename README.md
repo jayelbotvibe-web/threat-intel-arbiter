@@ -35,6 +35,24 @@ Every alert includes: **Severity** + **Confidence** + **Action** + **Explanation
 
 ---
 
+## Architecture
+
+![Threat Intel Arbiter Architecture](docs/architecture-overview.jpg)
+
+Five-stage pipeline — ingestion, normalization, match & score, explanation, routing — all in a single Go binary.
+
+| Stage | What it does |
+|---|---|
+| **Ingestion** | Pulls full MISP API firehose (no pre-filters) + CISA KEV catalog |
+| **Normalization** | Deduplication, attribute parsing, IOC extraction, metadata enrichment |
+| **Match & Score** | Runs matchers locally — tech stack, sector alignment, KEV factor, severity model, confidence model |
+| **Explainer** | Generates human-readable justification from the same scoring struct |
+| **Routing** | Routes by severity, confidence, and TLP to Slack, Teams, Email, CrowdStrike, SIEM |
+
+**Matchers run locally against your context:** tech stack (exact/fuzzy CVE match), sector alignment (NIS sector threats), KEV boost (actively exploited), CVSS/EPSS severity model, and confidence scoring based on source reliability + match quality + recency.
+
+---
+
 ## Quick Start
 
 ```bash
