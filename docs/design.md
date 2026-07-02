@@ -198,12 +198,53 @@ for both MISP and non-MISP users.
 Every source produces `ThreatEvent` structs via a normalizer.
 
 **Source: MISP (v1)**
+
 - Connects via REST API with HMAC-SHA256 authentication
 - Pulls events every 15 minutes (configurable)
 - Tracks NEW, MODIFIED, and DELETED events via timestamp cursor
 - Cold start: process all events from the last 7 days. Apply the full pipeline (normalize → filter → match → score). Suppress alerts with final severity below "high". This ensures sector intel, actor reports, and non-CVE events reach the matchers and build the historical baseline, even if they don't generate immediate alerts.
 - Fetches warninglists and noticelists on startup for filtering
 - Maps: MISP Event → ThreatEvent
+
+**Architecture: Pull-All, Filter-Local**
+
+The arbiter does **not** query MISP by artifact, galaxy, tag, or taxonomy. It makes exactly one unfiltered call:
+
+```
+GET /events/restSearch?returnFormat=json&limit=100&timestamp=1720000000
+```
+
+The only filter parameter is `timestamp` — for incremental polling. **Every event that MISP returns is pulled.** No galaxy selection. No tag pre-filtering. No CVE whitelist. The arbiter receives the complete event with all its metadata:
+
+```
+MISP Event (raw, unfiltered)
+  ├── Attributes:     CVE-2024-1234, 192.168.1.1, malware.exe hash, phishing URL...
+  ├── Tags:           tlp:amber, eu-nis-oes:energy, workflow:state="draft"...
+  ├── Galaxies:       threat-actor="APT29", mitre-attack-pattern="T1190"...
+  ├── Sightings:      org X reported seeing this at time T
+  └── Info:           "APT29 exploiting CVE-2024-1234 in energy sector"
+
+        ↓  NormalizeMISPEvent() — extracts only what matchers need
+
+Canonical ThreatEvent (arbiter-internal)
+  ├── CVEs:              ["CVE-2024-1234"]          ← from attributes
+  ├── CVSS:              9.8                         ← from attribute tags
+  ├── Tags:              ["tlp:amber", "eu-nis-oes:energy"]
+  ├── ThreatActors:      ["APT29"]                   ← from galaxy clusters
+  ├── References:        [...]                       ← from link-type attributes
+  └── SourceConfidence:  "medium"                    ← from TLP tag
+```
+
+**Why pull-all, filter-local?** If the arbiter pre-filtered by galaxy at the MISP API level, it would miss events where:
+- A threat actor the org doesn't track exploits a CVE in their tech stack
+- An event lacks galaxy tags but has sector-relevant taxonomy tags
+- An event comes from a feed the org hasn't "subscribed to" but still contains relevant CVEs
+
+The matching engine is the right place to decide relevance — it has the org's full context (tech stack, sector, KEV status). The MISP API doesn't.
+
+**What the arbiter extracts (and ignores):** The normalizer extracts CVEs, CVSS scores, taxonomy tags, threat actor names, and reference URLs. It **deliberately ignores** raw IOCs (IP addresses, domains, file hashes, email addresses, URLs from non-link attributes). The arbiter's job is vulnerability prioritization (CVE → tech stack matching), not IOC threat hunting. Those IOCs pass through the pipeline unread — they're available in the raw event stored in SQLite but don't feed into matching or scoring.
+
+**MISP as a threat intelligence aggregation channel:** MISP itself ingests from many upstream sources — other MISP instances (peers, ISACs), open-source feeds (CIRCL, AlienVault OTX, Abuse.ch), commercial feeds (FireEye, CrowdStrike, Recorded Future), government feeds (NCSC, CISA, national CSIRTs), and internal security tools (SIEM, EDR, manual analyst entries). The arbiter doesn't talk to these sources directly. **It talks to MISP, and MISP is the single integration point.** This means the arbiter benefits from whatever upstream enrichment the MISP instance has already performed, without needing connectors for each feed.
 
 **Source: CISA Known Exploited Vulnerabilities (v1)**
 - Public JSON file, no authentication required
@@ -781,7 +822,8 @@ binary that runs in their existing environment is an easy yes.
 | SQLite (not PostgreSQL) | Zero-config deployment. Upgrade path documented. |
 | Configuration files (not UI-first) | Version-controllable, diffable, reviewable. Admin API for programmatic updates. |
 | Single binary, one per org (v1) | Deploy in minutes. Multi-tenancy is a v2 feature; schema supports it already. |
-| Initial thresholds are uncalibrated guesses | Config-file tunable. Calibration requires production data. |
+|| Initial thresholds are uncalibrated guesses | Config-file tunable. Calibration requires production data. |
+|| **Pull-all, filter-local architecture** | Pre-filtering at the MISP API level (by galaxy, tag, or CVE) would miss relevant threats: an untracked threat actor exploiting a CVE in your stack, an event without galaxy tags but with sector-relevant taxonomies, or a feed you haven't subscribed to. The matching engine has the full org context to decide relevance. MISP is treated as an aggregation channel — the arbiter benefits from all upstream enrichment without per-feed connectors. |
 
 ---
 

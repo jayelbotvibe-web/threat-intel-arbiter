@@ -5,6 +5,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -14,8 +15,8 @@ type DB struct {
 	conn *sql.DB
 }
 
-// Open opens (or creates) the SQLite database at the given path
-// and runs any pending migrations.
+// Open opens (or creates) the SQLite database at the given path,
+// runs any pending migrations, and seeds the default admin user.
 func Open(path string) (*DB, error) {
 	conn, err := sql.Open("sqlite", path+"?_journal_mode=WAL&_foreign_keys=on&_busy_timeout=5000")
 	if err != nil {
@@ -28,6 +29,9 @@ func Open(path string) (*DB, error) {
 	db := &DB{conn: conn}
 	if err := db.migrate(); err != nil {
 		return nil, fmt.Errorf("migrate: %w", err)
+	}
+	if err := db.seedDefaultAdmin(); err != nil {
+		return nil, fmt.Errorf("seed admin: %w", err)
 	}
 	return db, nil
 }
@@ -142,10 +146,33 @@ func (db *DB) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity)`,
 		`CREATE INDEX IF NOT EXISTS idx_dedup_created ON dedup_hashes(created_at)`,
+
+		// v2 additions — add action column if not present
+		`ALTER TABLE alerts ADD COLUMN action TEXT NOT NULL DEFAULT ''`,
+
+		// v3 — user accounts + sessions
+		`CREATE TABLE IF NOT EXISTS users (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT NOT NULL UNIQUE,
+			password_hash TEXT NOT NULL,
+			role TEXT NOT NULL DEFAULT 'reader',
+			created_at TEXT NOT NULL DEFAULT (datetime('now'))
+		)`,
+		`CREATE TABLE IF NOT EXISTS sessions (
+			token TEXT PRIMARY KEY,
+			username TEXT NOT NULL,
+			role TEXT NOT NULL,
+			expires_at TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)`,
 	}
 
 	for i, m := range migrations {
 		if _, err := db.conn.Exec(m); err != nil {
+			// Skip "duplicate column" errors from ALTER TABLE
+			if strings.Contains(err.Error(), "duplicate column") {
+				continue
+			}
 			return fmt.Errorf("migration %d: %w", i+1, err)
 		}
 	}

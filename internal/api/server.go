@@ -1,8 +1,10 @@
 package api
 
 import (
+	"database/sql"
 	"embed"
 	"encoding/json"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -49,27 +51,38 @@ func (s *Server) ListenAndServe(addr string) error {
 }
 
 func (s *Server) registerRoutes() {
-	// Dashboard
+	// Auth endpoints (public — no session required)
+	s.Mux.HandleFunc("/login", s.handleLogin)
+	s.Mux.HandleFunc("/auth/login", s.handleLogin)
+	s.Mux.HandleFunc("/auth/logout", s.handleLogout)
+	s.Mux.HandleFunc("/auth/session", s.handleSession)
+
+	// Dashboard (auth required)
 	dashboardHTML, _ := fs.ReadFile(dashboardFS, "dashboard.html")
-	s.Mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	s.Mux.HandleFunc("/", s.requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(dashboardHTML)
-	})
+	}))
 
-	// Public read endpoints
+	// Health (public — no auth)
 	s.Mux.HandleFunc("/health", s.handleHealth)
-	s.Mux.HandleFunc("/api/alerts", s.handleAlerts)
-	s.Mux.HandleFunc("/api/techstack", s.handleTechStack)
-	s.Mux.HandleFunc("/api/stats", s.handleStats)
 
-	// Admin write endpoints (auth required)
-	s.Mux.HandleFunc("/admin/import", s.auth(s.handleAdminImport))
-	s.Mux.HandleFunc("/admin/ack/", s.auth(s.handleAdminAck))
-	s.Mux.HandleFunc("/admin/pull", s.auth(s.handleAdminPull))
+	// API endpoints (auth required)
+	s.Mux.HandleFunc("/api/alerts", s.requireAuth(s.handleAlerts))
+	s.Mux.HandleFunc("/api/alerts/", s.requireAuth(s.handleAlertDetail))
+	s.Mux.HandleFunc("/api/techstack", s.requireAuth(s.handleTechStack))
+	s.Mux.HandleFunc("/api/stats", s.requireAuth(s.handleStats))
+
+	// Admin write endpoints (admin role required — session or API key)
+	s.Mux.HandleFunc("/admin/import", s.requireAuth(s.requireAdmin(s.handleAdminImport)))
+	s.Mux.HandleFunc("/admin/ack/", s.requireAuth(s.requireAdmin(s.handleAdminAck)))
+	s.Mux.HandleFunc("/admin/pull", s.requireAuth(s.requireAdmin(s.handleAdminPull)))
+	s.Mux.HandleFunc("/admin/techstack", s.requireAuth(s.requireAdmin(s.handleAdminTechStack)))
+	s.Mux.HandleFunc("/admin/users", s.requireAuth(s.requireAdmin(s.handleAdminUsers)))
 }
 
 // auth wraps a handler with API key authentication.
@@ -98,8 +111,7 @@ func (s *Server) handleAdminImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse uploaded CSV
-	apps, err := config.ParseTechStackReader(r.Body)
+	apps, err := configParseTechStack(r.Body)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
@@ -113,10 +125,10 @@ func (s *Server) handleAdminImport(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("admin: import %d apps (%d added, %d removed)", len(apps), added, removed)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"status":  "ok",
+		"status":   "ok",
 		"imported": len(apps),
-		"added":   added,
-		"removed": removed,
+		"added":    added,
+		"removed":  removed,
 	})
 }
 
@@ -134,7 +146,6 @@ func (s *Server) handleAdminAck(w http.ResponseWriter, r *http.Request) {
 	}
 	alertID := parts[0]
 
-	// Parse optional body for resolution status
 	var body struct {
 		Status string `json:"status"` // "acked", "false_pos", "resolved"
 	}
@@ -160,31 +171,158 @@ func (s *Server) handleAdminPull(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{
-		"status": "ok",
+		"status":  "ok",
 		"message": "pull triggered (MISP poller will pull on next tick if configured)",
 	})
 }
 
+func (s *Server) handleAdminTechStack(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		// Add single app
+		var app model.App
+		if err := json.NewDecoder(r.Body).Decode(&app); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if app.Name == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name required"})
+			return
+		}
+		inet := 0
+		if app.InternetFacing {
+			inet = 1
+		}
+		_, err := s.DB.Conn().Exec(
+			`INSERT INTO tech_stack (name, version, vendor, category, criticality, owner_team, internet_facing, hosts, data_sensitivity, org_id)
+			 VALUES (?,?,?,?,?,?,?,?,?,'default')`,
+			app.Name, app.Version, app.Vendor, app.Category, app.Criticality, app.OwnerTeam, inet, app.Hosts, app.DataSensitivity)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		log.Printf("admin: added app %s", app.Name)
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "action": "added", "name": app.Name})
+
+	case http.MethodPut:
+		// Update single app
+		var app model.App
+		if err := json.NewDecoder(r.Body).Decode(&app); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if app.Name == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name required"})
+			return
+		}
+		inet := 0
+		if app.InternetFacing {
+			inet = 1
+		}
+		res, err := s.DB.Conn().Exec(
+			`UPDATE tech_stack SET version=?, vendor=?, category=?, criticality=?, owner_team=?, internet_facing=?, hosts=?, data_sensitivity=?
+			 WHERE name=? AND org_id='default'`,
+			app.Version, app.Vendor, app.Category, app.Criticality, app.OwnerTeam, inet, app.Hosts, app.DataSensitivity, app.Name)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "app not found"})
+			return
+		}
+		log.Printf("admin: updated app %s", app.Name)
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "action": "updated", "name": app.Name})
+
+	case http.MethodDelete:
+		// Remove single app — name in JSON body
+		var body struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if body.Name == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name required"})
+			return
+		}
+		res, err := s.DB.Conn().Exec("DELETE FROM tech_stack WHERE name=? AND org_id='default'", body.Name)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "app not found"})
+			return
+		}
+		log.Printf("admin: removed app %s", body.Name)
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "action": "removed", "name": body.Name})
+
+	default:
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+	}
+}
+
 // ─────────────────────────────────────────────────────────────
-// Public read handlers (unchanged)
+// Public read handlers
 // ─────────────────────────────────────────────────────────────
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	var alertCount, deadLetterCount int
+	var alertCount, newAlerts, deadLetterCount int
 	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM alerts").Scan(&alertCount)
+	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM alerts WHERE status='new'").Scan(&newAlerts)
 	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM dedup_hashes").Scan(&deadLetterCount)
 
+	// Last MISP pull cursor
+	var lastPull string
+	s.DB.Conn().QueryRow("SELECT value FROM state WHERE key='misp_cursor'").Scan(&lastPull)
+
+	// KEV entries count
+	var kevCount int
+	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM events WHERE source_id='kev-primary'").Scan(&kevCount)
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"status":        "ok",
-		"alerts_total":  alertCount,
-		"dedup_entries": deadLetterCount,
+		"status":           "ok",
+		"alerts_total":     alertCount,
+		"alerts_new":       newAlerts,
+		"last_misp_pull":   lastPull,
+		"kev_entries":      kevCount,
+		"dedup_entries":    deadLetterCount,
 	})
 }
 
 func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.DB.Conn().Query(
-		`SELECT id, event_id, severity, confidence, status, matched_apps, created_at
-		 FROM alerts ORDER BY created_at DESC LIMIT 50`)
+	q := r.URL.Query()
+
+	// Build WHERE clause from filters
+	conditions := []string{"1=1"}
+	args := []interface{}{}
+
+	if search := q.Get("q"); search != "" {
+		conditions = append(conditions, "(event_id LIKE ? OR explanation LIKE ?)")
+		like := "%" + search + "%"
+		args = append(args, like, like)
+	}
+	if app := q.Get("app"); app != "" {
+		conditions = append(conditions, "matched_apps LIKE ?")
+		args = append(args, "%"+app+"%")
+	}
+	if status := q.Get("status"); status != "" {
+		conditions = append(conditions, "status = ?")
+		args = append(args, status)
+	}
+	if sev := q.Get("severity"); sev != "" {
+		conditions = append(conditions, "severity = ?")
+		args = append(args, sev)
+	}
+
+	query := `SELECT id, event_id, severity, confidence, status, matched_apps, created_at, explanation, action
+		FROM alerts WHERE ` + strings.Join(conditions, " AND ") + ` ORDER BY created_at DESC LIMIT 200`
+
+	rows, err := s.DB.Conn().Query(query, args...)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -199,12 +337,14 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 		Status      string `json:"status"`
 		MatchedApps string `json:"matched_apps"`
 		CreatedAt   string `json:"created_at"`
+		Explanation string `json:"explanation"`
+		Action      string `json:"action"`
 	}
 
 	var alerts []alertRow
 	for rows.Next() {
 		var a alertRow
-		if err := rows.Scan(&a.ID, &a.EventID, &a.Severity, &a.Confidence, &a.Status, &a.MatchedApps, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.EventID, &a.Severity, &a.Confidence, &a.Status, &a.MatchedApps, &a.CreatedAt, &a.Explanation, &a.Action); err != nil {
 			continue
 		}
 		alerts = append(alerts, a)
@@ -216,6 +356,43 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleAlertDetail(w http.ResponseWriter, r *http.Request) {
+	// Extract alert ID from URL: /api/alerts/<alert_id>
+	id := strings.TrimPrefix(r.URL.Path, "/api/alerts/")
+	if id == "" {
+		http.Error(w, `{"error":"alert ID required"}`, http.StatusBadRequest)
+		return
+	}
+
+	var detail struct {
+		ID          string `json:"id"`
+		EventID     string `json:"event_id"`
+		Severity    string `json:"severity"`
+		Confidence  string `json:"confidence"`
+		Status      string `json:"status"`
+		MatchedApps string `json:"matched_apps"`
+		CreatedAt   string `json:"created_at"`
+		Explanation string `json:"explanation"`
+		Action      string `json:"action"`
+		RoutedTo    string `json:"routed_to"`
+	}
+
+	err := s.DB.Conn().QueryRow(
+		`SELECT id, event_id, severity, confidence, status, matched_apps, created_at, explanation, action, routed_to
+		 FROM alerts WHERE id = ?`, id,
+	).Scan(&detail.ID, &detail.EventID, &detail.Severity, &detail.Confidence, &detail.Status, &detail.MatchedApps, &detail.CreatedAt, &detail.Explanation, &detail.Action, &detail.RoutedTo)
+	if err == sql.ErrNoRows {
+		http.Error(w, `{"error":"alert not found"}`, http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, detail)
+}
+
 func (s *Server) handleTechStack(w http.ResponseWriter, r *http.Request) {
 	apps, err := s.DB.ListTechStack()
 	if err != nil {
@@ -224,19 +401,29 @@ func (s *Server) handleTechStack(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type appSummary struct {
-		Name        string `json:"name"`
-		Version     string `json:"version"`
-		Criticality string `json:"criticality"`
-		Internet    bool   `json:"internet_facing"`
+		Name           string `json:"name"`
+		Version        string `json:"version"`
+		Vendor         string `json:"vendor"`
+		Category       string `json:"category"`
+		Criticality    string `json:"criticality"`
+		OwnerTeam      string `json:"owner_team"`
+		InternetFacing bool   `json:"internet_facing"`
+		Hosts          string `json:"hosts"`
+		DataSensitivity string `json:"data_sensitivity"`
 	}
 
 	var list []appSummary
 	for _, a := range apps {
 		list = append(list, appSummary{
-			Name:        a.Name,
-			Version:     a.Version,
-			Criticality: a.Criticality,
-			Internet:    a.InternetFacing,
+			Name:            a.Name,
+			Version:         a.Version,
+			Vendor:          a.Vendor,
+			Category:        a.Category,
+			Criticality:     a.Criticality,
+			OwnerTeam:       a.OwnerTeam,
+			InternetFacing:  a.InternetFacing,
+			Hosts:           a.Hosts,
+			DataSensitivity: a.DataSensitivity,
 		})
 	}
 
@@ -278,4 +465,10 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
+}
+
+// configParseTechStack parses a CSV tech stack from a reader.
+// Delegates to the config package parser.
+func configParseTechStack(r io.Reader) ([]model.App, error) {
+	return config.ParseTechStackReader(r)
 }

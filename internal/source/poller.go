@@ -25,6 +25,11 @@ func (p *MISPPoller) Run(ctx context.Context) error {
 	ticker := time.NewTicker(p.Interval)
 	defer ticker.Stop()
 
+	// If we have a saved cursor from a previous run, skip cold start
+	if p.ColdStart && p.getCursor() != "" {
+		p.ColdStart = false
+	}
+
 	// Run immediately on start
 	if err := p.poll(ctx); err != nil {
 		log.Printf("misp poller: initial poll error: %v", err)
@@ -103,9 +108,10 @@ func (p *MISPPoller) poll(ctx context.Context) error {
 		}
 	}
 
-	// Update cursor to now
-	if len(events) > 0 {
-		p.setCursor(fmt.Sprintf("%d", time.Now().Unix()))
+	// Update cursor to now (always, even if 0 events — we checked up to this point)
+	p.setCursor(fmt.Sprintf("%d", time.Now().Unix()))
+	if p.ColdStart {
+		log.Printf("misp poller: cold start complete, next poll will be incremental")
 		p.ColdStart = false
 	}
 

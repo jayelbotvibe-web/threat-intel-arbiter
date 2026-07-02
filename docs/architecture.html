@@ -47,8 +47,8 @@
 
         <!-- Banner -->
         <rect x="14" y="6" width="1096" height="48" rx="6" fill="rgba(6,78,59,0.08)" stroke="#34d399" stroke-width="0.8"/>
-        <text x="30" y="26" fill="#34d399" font-size="9" font-weight="600">Threat Intel Arbiter — threat prioritization engine. One binary, 60-second deploy. MISP + KEV sources. Severity + Confidence + Explanation.</text>
-        <text x="30" y="44" fill="#475569" font-size="7.5">Differentiator: single binary (no DB server, no queue, no runtime) vs. MISP/OpenCTI/ThreatConnect multi-service stacks. Moats: calibration quality (feedback loop) + normalizer library depth.</text>
+        <text x="30" y="26" fill="#34d399" font-size="9" font-weight="600">Threat Intel Arbiter — threat prioritization engine. One binary, 60-second deploy. Pull-all, filter-local architecture. MISP + KEV sources. Severity + Confidence + Explanation.</text>
+        <text x="30" y="44" fill="#475569" font-size="7.5">No galaxy/tag/CVE pre-filter at API level. Arbiter fetches ALL events from MISP — matchers decide relevance locally against org tech stack + sector + KEV. MISP is a threat intel aggregation channel, not a filtering gate.</text>
 
         <!-- ============================================================
              LEFT: INPUTS
@@ -72,13 +72,14 @@
         <text x="91" y="260" fill="#a78bfa" font-size="9" font-weight="600" text-anchor="middle">Config Files</text>
         <text x="91" y="278" fill="#94a3b8" font-size="7.5" text-anchor="middle">techstack.csv · routing.yaml · risk.yaml · sources.yaml</text>
 
-        <!-- MISP (primary v1 source) -->
+        <!-- MISP (primary v1 source) — aggregation channel -->
         <rect x="14" y="310" width="155" height="100" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
         <text x="91" y="334" fill="white" font-size="10" font-weight="600" text-anchor="middle">MISP ★ v1 primary</text>
-        <text x="91" y="354" fill="#94a3b8" font-size="7.5" text-anchor="middle">REST · HMAC auth</text>
-        <text x="91" y="372" fill="#94a3b8" font-size="7.5" text-anchor="middle">Events · Attributes · Tags</text>
-        <text x="91" y="390" fill="#94a3b8" font-size="7.5" text-anchor="middle">Sightings · Galaxies</text>
-        <text x="91" y="406" fill="#fbbf24" font-size="7" text-anchor="middle">Rich data: enables all 4 risk dims</text>
+        <text x="91" y="352" fill="#fbbf24" font-size="7" text-anchor="middle">Aggregation channel</text>
+        <text x="91" y="368" fill="#94a3b8" font-size="7" text-anchor="middle">Peers · ISACs · OSINT · Commer.</text>
+        <text x="91" y="384" fill="#94a3b8" font-size="7.5" text-anchor="middle">REST · HMAC · pull ALL events</text>
+        <text x="91" y="400" fill="#94a3b8" font-size="7" text-anchor="middle">No galaxy/tag/CVE pre-filter</text>
+        <text x="91" y="412" fill="#fbbf24" font-size="6.5" text-anchor="middle">Rich data: all 4 risk dims</text>
 
         <!-- KEV (v1 secondary) -->
         <rect x="14" y="430" width="155" height="52" rx="6" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="1.5"/>
@@ -112,15 +113,15 @@
         <rect x="212" y="196" width="260" height="78" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
         <text x="342" y="216" fill="white" font-size="9" font-weight="600" text-anchor="middle">Source Pollers (cron goroutines)</text>
         <text x="342" y="234" fill="#94a3b8" font-size="7.5" text-anchor="middle">MISP: GET /events/restSearch (15m)</text>
-        <text x="342" y="250" fill="#94a3b8" font-size="7.5" text-anchor="middle">KEV: GET cisa.gov/kev.json (daily)</text>
-        <text x="342" y="266" fill="#34d399" font-size="7.5" text-anchor="middle">Tracks: NEW · MODIFIED · DELETED</text>
+        <text x="342" y="250" fill="#fbbf24" font-size="7" text-anchor="middle">Unfiltered: no galaxy/tag/CVE param</text>
+        <text x="342" y="266" fill="#94a3b8" font-size="7.5" text-anchor="middle">KEV: GET cisa.gov/kev.json (daily)</text>
 
         <!-- Normalizers -->
         <rect x="490" y="196" width="242" height="78" rx="6" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.2"/>
         <text x="611" y="216" fill="white" font-size="9" font-weight="600" text-anchor="middle">Normalization Layer</text>
-        <text x="611" y="234" fill="#94a3b8" font-size="7.5" text-anchor="middle">MISP Event → ThreatEvent</text>
-        <text x="611" y="250" fill="#94a3b8" font-size="7.5" text-anchor="middle">KEV Entry → ThreatEvent</text>
-        <text x="611" y="266" fill="#34d399" font-size="7.5" text-anchor="middle">Canonical model: source-agnostic</text>
+        <text x="611" y="234" fill="#94a3b8" font-size="7.5" text-anchor="middle">Extracts: CVEs · CVSS · tags · actors · refs</text>
+        <text x="611" y="250" fill="#475569" font-size="7" text-anchor="middle">Ignores: raw IOCs (IPs, hashes, domains)</text>
+        <text x="611" y="266" fill="#34d399" font-size="7.5" text-anchor="middle">Canonical ThreatEvent: source-agnostic</text>
 
         <!-- Warning Filter -->
         <rect x="490" y="298" width="242" height="48" rx="6" fill="rgba(136,19,55,0.2)" stroke="#fb7185" stroke-width="1.5"/>
@@ -289,7 +290,8 @@
 
         <!-- MISP → Pollers -->
         <line x1="169" y1="360" x2="210" y2="230" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#a-am)"/>
-        <text x="186" y="290" fill="#fbbf24" font-size="7.5" text-anchor="middle">Events</text>
+        <text x="186" y="290" fill="#fbbf24" font-size="7" text-anchor="middle">ALL events</text>
+        <text x="186" y="302" fill="#fbbf24" font-size="6" text-anchor="middle">no filter</text>
 
         <!-- KEV → Pollers -->
         <line x1="169" y1="456" x2="210" y2="246" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#a-bl)"/>

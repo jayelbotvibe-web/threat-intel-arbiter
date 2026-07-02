@@ -328,6 +328,118 @@ func TestMISPPoller_FirstRun(t *testing.T) {
 	}
 }
 
+func TestMISPPoller_SecondRun_NoColdStart(t *testing.T) {
+	srv := fixtureServer(t)
+	defer srv.Close()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+	db, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	events := make(chan model.ThreatEvent, 100)
+	poller := &MISPPoller{
+		Client:    NewMISPClient(srv.URL, "test-api-key"),
+		DB:        db,
+		Events:    events,
+		Interval:  15 * time.Minute,
+		ColdStart: true,
+	}
+
+	ctx := t.Context()
+
+	// First poll: cold start
+	if err := poller.poll(ctx); err != nil {
+		t.Fatalf("first poll: %v", err)
+	}
+	if poller.ColdStart {
+		t.Fatal("cold start should be false after first poll")
+	}
+	// Drain events
+	close(events)
+	for range events {
+	}
+
+	// Second poll: should NOT cold start
+	events2 := make(chan model.ThreatEvent, 100)
+	poller.Events = events2
+
+	if err := poller.poll(ctx); err != nil {
+		t.Fatalf("second poll: %v", err)
+	}
+	if poller.ColdStart {
+		t.Error("cold start should remain false on second poll")
+	}
+
+	// Verify cursor was persisted
+	cursor := poller.getCursor()
+	if cursor == "" {
+		t.Error("cursor should be set after cold start")
+	}
+	t.Logf("second poll cursor: %s", cursor)
+}
+
+func TestMISPPoller_CursorPersistsAcrossRestart(t *testing.T) {
+	srv := fixtureServer(t)
+	defer srv.Close()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+	db, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+
+	events := make(chan model.ThreatEvent, 100)
+	poller := &MISPPoller{
+		Client:    NewMISPClient(srv.URL, "test-api-key"),
+		DB:        db,
+		Events:    events,
+		Interval:  15 * time.Minute,
+		ColdStart: true,
+	}
+
+	ctx := t.Context()
+
+	// First poll: cold start, saves cursor
+	if err := poller.poll(ctx); err != nil {
+		t.Fatalf("first poll: %v", err)
+	}
+	close(events)
+	for range events {
+	}
+	db.Close()
+
+	// Simulate restart: reopen DB, new poller with ColdStart=true
+	db2, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("reopen db: %v", err)
+	}
+	defer db2.Close()
+
+	events2 := make(chan model.ThreatEvent, 100)
+	poller2 := &MISPPoller{
+		Client:    NewMISPClient(srv.URL, "test-api-key"),
+		DB:        db2,
+		Events:    events2,
+		Interval:  15 * time.Minute,
+		ColdStart: true, // main.go always sets this true
+	}
+
+	// Run() should detect existing cursor and skip cold start
+	// (We test the logic directly since Run() blocks)
+	if poller2.ColdStart && poller2.getCursor() != "" {
+		poller2.ColdStart = false // this is what Run() does now
+	}
+	if poller2.ColdStart {
+		t.Error("cursor persisted across restart — cold start should be skipped")
+	}
+	t.Log("cursor persisted across simulated restart")
+}
+
 func TestMISPClient_AuthFailure(t *testing.T) {
 	// Server that rejects requests without auth
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -15,10 +15,27 @@
     .badge-high { background: #7c2d12; color: #fdba74; border: 1px solid #9a3412; }
     .badge-med  { background: #713f12; color: #fde047; border: 1px solid #854d0e; }
     .badge-low  { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .badge-info { background: #1e3a5f; color: #7dd3fc; border: 1px solid #1e40af; }
+    .btn-primary { background: #0e7490; color: white; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; }
+    .btn-danger { background: #9f1239; color: #fda4af; border: 1px solid #be123c; border-radius: 6px; padding: 5px 12px; font-size: 11px; }
+    .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #475569; border-radius: 6px; padding: 5px 12px; font-size: 11px; }
     button { cursor: pointer; transition: all 0.15s; }
     button:hover { filter: brightness(1.2); }
     .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-weight: 600; z-index: 100; animation: fadeIn 0.3s; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .detail-panel { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-top: 4px; }
+    .exp-block { background: #1e293b; border-radius: 6px; padding: 12px; margin-top: 8px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+    .health-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .health-dot.ok { background: #22c55e; }
+    .health-dot.warn { background: #f59e0b; }
+    .health-dot.err { background: #ef4444; }
+    input, select { background: #1e293b; border: 1px solid #475569; color: #e2e8f0; border-radius: 6px; padding: 6px 10px; font-size: 12px; }
+    input:focus, select:focus { outline: none; border-color: #22d3ee; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 50; align-items: center; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.5rem; max-width: 560px; width: 100%; max-height: 80vh; overflow-y: auto; }
+    .editable { border-bottom: 1px dashed #475569; cursor: pointer; }
+    .editable:hover { border-bottom-color: #22d3ee; }
   </style>
 </head>
 <body class="p-6">
@@ -31,9 +48,22 @@
         <h1 class="text-2xl font-bold tracking-tight">Threat Intel Arbiter</h1>
       </div>
       <div class="flex items-center gap-3">
+        <span class="text-xs text-cyan-400" id="headerUser"></span>
         <span class="text-xs text-slate-400" id="lastUpdate">—</span>
         <button onclick="refreshAll()" class="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600">🔄 Refresh</button>
+        <button onclick="document.getElementById('settings-modal').classList.add('active')" class="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 admin-only">⚙ Settings</button>
+        <button onclick="logout()" class="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600">🚪 Logout</button>
       </div>
+    </div>
+
+    <!-- Health Bar -->
+    <div class="flex items-center gap-6 mb-4 px-4 py-2 bg-slate-800/50 rounded-lg border border-slate-700 text-xs" id="healthBar">
+      <span class="text-slate-400">System:</span>
+      <span><span class="health-dot ok" id="hMisp"></span>MISP <span id="hMispText">—</span></span>
+      <span><span class="health-dot ok" id="hKev"></span>KEV <span id="hKevText">—</span></span>
+      <span><span class="health-dot ok" id="hNew"></span><span id="hNewCount">0</span> new alerts</span>
+      <span class="flex-1"></span>
+      <span class="text-slate-500" id="hCursor">—</span>
     </div>
 
     <!-- Stat Bar -->
@@ -61,29 +91,45 @@
     </div>
 
     <!-- Tabs -->
-    <div class="flex gap-0 mb-6 border-b border-slate-700">
-      <button class="px-4 py-2 text-sm font-medium border-b-2 border-cyan-400 text-cyan-400" onclick="switchTab('alerts')" id="tab-alerts">Alerts</button>
-      <button class="px-4 py-2 text-sm font-medium text-slate-500" onclick="switchTab('import')" id="tab-import">Import CSV</button>
-      <button class="px-4 py-2 text-sm font-medium text-slate-500" onclick="switchTab('techstack')" id="tab-techstack">Tech Stack</button>
+    <div class="flex gap-0 mb-4 border-b border-slate-700" id="tabs">
+      <button class="px-4 py-2 text-sm font-medium border-b-2 border-cyan-400 text-cyan-400 tab" data-tab="alerts">Alerts</button>
+      <button class="px-4 py-2 text-sm font-medium text-slate-500 tab admin-only" data-tab="import">Import CSV</button>
+      <button class="px-4 py-2 text-sm font-medium text-slate-500 tab" data-tab="techstack">Tech Stack</button>
+      <button class="px-4 py-2 text-sm font-medium text-slate-500 tab admin-only" data-tab="users">Users</button>
     </div>
 
     <!-- Alerts Tab -->
     <div id="panel-alerts">
-      <div class="flex items-center gap-2 mb-3">
-        <button class="px-2 py-0.5 text-xs rounded-full border border-rose-700 bg-rose-900/20 text-rose-300" onclick="filterAlerts('critical')">Critical</button>
-        <button class="px-2 py-0.5 text-xs rounded-full border border-amber-700 bg-amber-900/20 text-amber-300" onclick="filterAlerts('high')">High</button>
-        <button class="px-2 py-0.5 text-xs rounded-full border border-yellow-700 bg-yellow-900/20 text-yellow-300" onclick="filterAlerts('medium')">Medium</button>
-        <button class="px-2 py-0.5 text-xs rounded-full border border-slate-600 text-slate-400" onclick="filterAlerts('all')">All</button>
+      <!-- Search + Filters -->
+      <div class="flex items-center gap-2 mb-3 flex-wrap">
+        <input class="w-56" placeholder="🔍 Search CVE, event, explanation..." id="alertSearch" oninput="filterAlerts()">
+        <select id="filterStatus" onchange="filterAlerts()" class="w-32">
+          <option value="">All statuses</option>
+          <option value="new">New</option>
+          <option value="acked">Acknowledged</option>
+          <option value="false_pos">False Positive</option>
+          <option value="resolved">Resolved</option>
+        </select>
+        <select id="filterSev" onchange="filterAlerts()" class="w-28">
+          <option value="">All severity</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <input class="w-40" placeholder="Filter by app..." id="filterApp" oninput="filterAlerts()">
+        <div class="flex-1"></div>
+        <span id="alertCount" class="text-xs text-slate-500"></span>
       </div>
       <div class="card p-0 overflow-hidden">
         <div class="grid grid-cols-12 gap-2 px-4 py-2 text-xs text-slate-500 border-b border-slate-700 font-medium">
           <div class="col-span-1">Sev</div>
           <div class="col-span-1">Conf</div>
-          <div class="col-span-3">Event</div>
+          <div class="col-span-2">Event</div>
           <div class="col-span-2">Matched Apps</div>
-          <div class="col-span-2">Status</div>
-          <div class="col-span-2">Time</div>
-          <div class="col-span-1"></div>
+          <div class="col-span-1">Status</div>
+          <div class="col-span-1">Time</div>
+          <div class="col-span-4">Actions</div>
         </div>
         <div id="alertList">
           <div class="px-4 py-8 text-center text-slate-500">Loading alerts...</div>
@@ -99,7 +145,7 @@
         <div class="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center mb-4" id="dropZone">
           <p class="text-slate-400 mb-3">Drop CSV file here or click to select</p>
           <input type="file" accept=".csv" id="csvFile" class="hidden" onchange="handleCSV(this)">
-          <button onclick="document.getElementById('csvFile').click()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-medium">Choose File</button>
+          <button onclick="document.getElementById('csvFile').click()" class="btn-primary">Choose File</button>
         </div>
         <div id="importResult" class="hidden text-sm"></div>
       </div>
@@ -107,7 +153,34 @@
 
     <!-- Tech Stack Tab -->
     <div id="panel-techstack" style="display:none">
+      <!-- Add new app -->
+      <div class="card mb-4" id="addAppForm" style="display:none">
+        <h3 class="text-sm font-semibold mb-3">Add Application</h3>
+        <div class="grid grid-cols-4 gap-2">
+          <input placeholder="Name *" id="addName">
+          <input placeholder="Version" id="addVersion">
+          <input placeholder="Vendor" id="addVendor">
+          <input placeholder="Category" id="addCategory">
+          <select id="addCriticality"><option value="medium">Medium</option><option value="critical">Critical</option><option value="high">High</option><option value="low">Low</option></select>
+          <input placeholder="Owner team" id="addOwner">
+          <select id="addInternet"><option value="false">Internal</option><option value="true">Internet-facing</option></select>
+          <input placeholder="Hosts" id="addHosts">
+          <select id="addDataSens"><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option><option value="low">Low</option></select>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <button class="btn-primary" onclick="addApp()">✓ Add</button>
+          <button class="btn-ghost" onclick="document.getElementById('addAppForm').style.display='none'">Cancel</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 mb-3">
+        <button class="btn-primary" onclick="document.getElementById('addAppForm').style.display='block'">+ Add App</button>
+        <span class="text-xs text-slate-400 admin-only">Click any row to edit (admin). Changes save on blur.</span>
+        <span class="text-xs text-slate-400 reader-only" style="display:none">Read-only view. Contact admin to modify.</span>
+      </div>
       <div class="card p-0 overflow-hidden">
+        <div class="grid grid-cols-6 gap-2 px-4 py-2 text-xs text-slate-500 border-b border-slate-700 font-medium">
+          <div>Application</div><div>Version</div><div>Criticality</div><div>Internet</div><div>Category</div><div></div>
+        </div>
         <div id="techstackList">
           <div class="px-4 py-8 text-center text-slate-500">Loading...</div>
         </div>
@@ -116,130 +189,364 @@
 
   </div>
 
+  <!-- Users Panel (admin only) -->
+  <div id="panel-users" style="display:none">
+    <div class="flex items-center gap-2 mb-3">
+      <button class="btn-primary" onclick="showAddUser()">+ Add User</button>
+    </div>
+    <div class="card p-0 overflow-hidden">
+      <div class="grid grid-cols-4 gap-2 px-4 py-2 text-xs text-slate-500 border-b border-slate-700 font-medium">
+        <div>Username</div><div>Role</div><div>Actions</div><div></div>
+      </div>
+      <div id="userList"><div class="px-4 py-8 text-center text-slate-500">Loading...</div></div>
+    </div>
+    <!-- Add/Edit User Form -->
+    <div class="card mt-3" id="userForm" style="display:none">
+      <h3 class="text-sm font-semibold mb-2" id="userFormTitle">Add User</h3>
+      <input class="w-full mb-2" id="userUsername" placeholder="Username">
+      <input class="w-full mb-2" type="password" id="userPassword" placeholder="Password">
+      <select class="w-full mb-3" id="userRole"><option value="reader">Reader</option><option value="admin">Admin</option></select>
+      <div class="flex gap-2">
+        <button class="btn-primary" onclick="saveUser()">Save</button>
+        <button class="btn-ghost" onclick="document.getElementById('userForm').style.display='none'">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal-box">
+      <h2 class="text-lg font-semibold mb-4">⚙ Settings</h2>
+      <label class="block text-xs text-slate-400 mb-1">Admin API Key (required for any change)</label>
+      <input class="w-full mb-3" type="password" id="settingsKey" placeholder="Enter admin key..." onchange="saveSettings()">
+      <label class="block text-xs text-slate-400 mb-1">Slack Webhook URL</label>
+      <input class="w-full mb-3" id="settingsSlack" placeholder="https://hooks.slack.com/..." onchange="saveSettings()">
+      <label class="block text-xs text-slate-400 mb-1">Teams Webhook URL</label>
+      <input class="w-full mb-3" id="settingsTeams" placeholder="https://..." onchange="saveSettings()">
+      <label class="block text-xs text-slate-400 mb-1">Email (SMTP target)</label>
+      <input class="w-full mb-4" id="settingsEmail" placeholder="soc@company.com" onchange="saveSettings()">
+      <div class="flex gap-2">
+        <button class="btn-primary" onclick="testSettings()">Test Notifications</button>
+        <button class="btn-ghost" onclick="document.getElementById('settings-modal').classList.remove('active')">Close</button>
+      </div>
+      <div id="settingsResult" class="text-xs mt-3"></div>
+    </div>
+  </div>
+
+  <!-- Alert Detail Modal -->
+  <div class="modal-overlay" id="detail-modal">
+    <div class="modal-box" style="max-width:700px">
+      <div id="detailContent"></div>
+      <button class="btn-ghost mt-4" onclick="document.getElementById('detail-modal').classList.remove('active')">Close</button>
+    </div>
+  </div>
+
   <script>
     const API = '';
-    const ADMIN_KEY = localStorage.getItem('arbiter_admin_key') || '';
+    const ADMIN_KEY = () => localStorage.getItem('arbiter_admin_key') || '';
 
-    function api(path) {
-      return fetch(API + path)
-        .then(r => r.json())
-        .catch(e => console.error(path, e));
+    // ─── API helpers ───
+    async function get(path) {
+      const r = await fetch(API + path);
+      return r.json();
     }
-
-    function adminAPI(path, body) {
-      return fetch(API + path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Arbiter-Key': ADMIN_KEY },
-        body: JSON.stringify(body)
-      }).then(r => r.json());
-    }
-
-    function severityBadge(sev) {
-      const map = { critical: 'badge-crit', high: 'badge-high', medium: 'badge-med', low: 'badge-low' };
-      return `<span class="${map[sev] || 'badge-low'} text-xs px-2 py-0.5 rounded-full">${sev.toUpperCase()}</span>`;
-    }
-
-    function refreshAll() {
-      // Stats
-      api('/api/stats').then(data => {
-        if (!data || !data.alerts) return;
-        document.getElementById('statCritical').textContent = data.alerts.critical || 0;
-        document.getElementById('statHigh').textContent = data.alerts.high || 0;
-        document.getElementById('statMedium').textContent = data.alerts.medium || 0;
-        document.getElementById('statLow').textContent = data.alerts.low || 0;
-        document.getElementById('statApps').textContent = data.apps_tracked || 0;
-        document.getElementById('lastUpdate').textContent = 'Updated just now';
+    async function adminPost(path, body) {
+      const r = await fetch(API + path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Arbiter-Key': ADMIN_KEY() }, body: JSON.stringify(body)
       });
+      return r.json();
+    }
+    async function adminPut(path, body) {
+      const r = await fetch(API + path, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Arbiter-Key': ADMIN_KEY() }, body: JSON.stringify(body)
+      });
+      return r.json();
+    }
+    async function adminDel(path, body) {
+      const r = await fetch(API + path, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json', 'X-Arbiter-Key': ADMIN_KEY() }, body: JSON.stringify(body)
+      });
+      return r.json();
+    }
+
+    function sevBadge(s) {
+      const m = { critical: 'badge-crit', high: 'badge-high', medium: 'badge-med', low: 'badge-low' };
+      return `<span class="${m[s] || 'badge-low'} text-xs px-2 py-0.5 rounded-full font-medium">${(s||'').toUpperCase()}</span>`;
+    }
+    function statusColor(s) {
+      const m = { new: 'text-rose-400', acked: 'text-amber-400', false_pos: 'text-purple-400', resolved: 'text-emerald-400' };
+      return m[s] || 'text-slate-400';
+    }
+
+    // ─── Refresh all ───
+    var allAlerts = [];
+
+    async function refreshAll() {
+      const [stats, alerts, health] = await Promise.all([
+        get('/api/stats'), get('/api/alerts'), get('/health')
+      ]);
+
+      // Stats
+      if (stats && stats.alerts) {
+        document.getElementById('statCritical').textContent = stats.alerts.critical || 0;
+        document.getElementById('statHigh').textContent = stats.alerts.high || 0;
+        document.getElementById('statMedium').textContent = stats.alerts.medium || 0;
+        document.getElementById('statLow').textContent = stats.alerts.low || 0;
+        document.getElementById('statApps').textContent = stats.apps_tracked || 0;
+      }
+
+      // Health bar
+      if (health) {
+        const cursor = health.last_misp_pull;
+        const date = cursor ? new Date(parseInt(cursor) * 1000) : null;
+        document.getElementById('hMispText').textContent = date ? 'pulled ' + date.toLocaleString() : 'no pull yet';
+        document.getElementById('hMisp').className = 'health-dot ' + (date ? 'ok' : 'warn');
+        document.getElementById('hKevText').textContent = (health.kev_entries || 0) + ' entries';
+        document.getElementById('hKev').className = 'health-dot ' + ((health.kev_entries || 0) > 0 ? 'ok' : 'warn');
+        document.getElementById('hNewCount').textContent = health.alerts_new || 0;
+        document.getElementById('hNew').className = 'health-dot ' + ((health.alerts_new || 0) > 0 ? 'warn' : 'ok');
+        if (date) document.getElementById('hCursor').textContent = 'Last MISP: ' + date.toLocaleString();
+      }
 
       // Alerts
-      api('/api/alerts').then(data => {
-        if (!data || !data.alerts) return;
-        const list = document.getElementById('alertList');
-        if (data.alerts.length === 0) {
-          list.innerHTML = '<div class="px-4 py-8 text-center text-slate-500">No alerts yet. Connect MISP or KEV to start receiving threat intelligence.</div>';
-          return;
+      allAlerts = (alerts && alerts.alerts) ? alerts.alerts : [];
+      document.getElementById('lastUpdate').textContent = 'Updated just now';
+      renderAlerts();
+    }
+
+    function renderAlerts() {
+      const list = document.getElementById('alertList');
+      const q = (document.getElementById('alertSearch').value || '').toLowerCase();
+      const status = document.getElementById('filterStatus').value;
+      const sev = document.getElementById('filterSev').value;
+      const app = (document.getElementById('filterApp').value || '').toLowerCase();
+
+      let filtered = allAlerts;
+      if (q) filtered = filtered.filter(a => (a.event_id||'').toLowerCase().includes(q) || (a.explanation||'').toLowerCase().includes(q));
+      if (status) filtered = filtered.filter(a => a.status === status);
+      if (sev) filtered = filtered.filter(a => a.severity === sev);
+      if (app) filtered = filtered.filter(a => (a.matched_apps||'').toLowerCase().includes(app));
+
+      document.getElementById('alertCount').textContent = `Showing ${filtered.length}/${allAlerts.length}`;
+
+      if (filtered.length === 0) {
+        list.innerHTML = '<div class="px-4 py-8 text-center text-slate-500">No alerts match your filters.</div>';
+        return;
+      }
+
+      list.innerHTML = filtered.map((a, i) => {
+        let eventDisplay = (a.event_id || '').length > 36 ? a.event_id.substring(0, 36) + '…' : (a.event_id || '');
+        let actionBar = '';
+        if (a.status === 'new' || a.status === 'acked') {
+          actionBar = `
+            <button class="btn-ghost text-xs" onclick="event.stopPropagation(); updateAlert('${a.id}','acked')">✓ Ack</button>
+            <button class="btn-danger text-xs" onclick="event.stopPropagation(); updateAlert('${a.id}','false_pos')">✗ False Pos</button>
+            <button class="btn-ghost text-xs" onclick="event.stopPropagation(); updateAlert('${a.id}','resolved')">✔ Resolve</button>
+          `;
         }
-        list.innerHTML = data.alerts.map(a => `
-          <div class="grid grid-cols-12 gap-2 px-4 py-2.5 text-sm row-hover border-b border-slate-800 items-center alert-row" data-severity="${a.severity}">
-            <div class="col-span-1">${severityBadge(a.severity)}</div>
+        return `
+          <div class="grid grid-cols-12 gap-2 px-4 py-2.5 text-sm row-hover border-b border-slate-800 items-center" style="cursor:pointer" onclick="showDetail('${a.id}')">
+            <div class="col-span-1">${sevBadge(a.severity)}</div>
             <div class="col-span-1 text-xs">${a.confidence}</div>
-            <div class="col-span-3 text-xs truncate" title="${a.event_id}">${a.event_id.substring(0,20)}...</div>
-            <div class="col-span-2 text-xs text-slate-400">${(a.matched_apps || '[]').substring(0,30)}</div>
-            <div class="col-span-2 text-xs">
-              <span class="${a.status === 'new' ? 'text-rose-400' : a.status === 'acked' ? 'text-amber-400' : 'text-emerald-400'}">${a.status}</span>
-            </div>
-            <div class="col-span-2 text-xs text-slate-500">${(a.created_at||'').substring(11,19)}</div>
-            <div class="col-span-1">
-              <button onclick="ackAlert('${a.id}')" class="text-xs px-2 py-0.5 rounded border border-slate-600 text-slate-400 hover:bg-slate-700">Ack</button>
+            <div class="col-span-2 text-xs truncate" title="${a.event_id}">${eventDisplay}</div>
+            <div class="col-span-2 text-xs text-slate-400 truncate">${(a.matched_apps||'[]').replace(/[\[\]"]/g,'').substring(0,40)}</div>
+            <div class="col-span-1 text-xs ${statusColor(a.status)}">${a.status}</div>
+            <div class="col-span-1 text-xs text-slate-500">${(a.created_at||'').substring(11,16)}</div>
+            <div class="col-span-4 flex gap-1">${actionBar}
+              <button class="btn-ghost text-xs" onclick="event.stopPropagation(); showDetail('${a.id}')">📋 Detail</button>
             </div>
           </div>
-        `).join('');
-      });
-
-      // Tech stack
-      api('/api/techstack').then(data => {
-        if (!data || !data.apps) return;
-        document.getElementById('techstackList').innerHTML = `
-          <div class="grid grid-cols-5 gap-2 px-4 py-2 text-xs text-slate-500 border-b border-slate-700 font-medium">
-            <div>Application</div><div>Version</div><div>Criticality</div><div>Internet</div><div>Category</div>
-          </div>
-          ${data.apps.slice(0, 50).map(a => `
-            <div class="grid grid-cols-5 gap-2 px-4 py-2 text-sm row-hover border-b border-slate-800">
-              <div>${a.name}</div>
-              <div class="text-slate-400 text-xs">${a.version || '—'}</div>
-              <div>${severityBadge(a.criticality)}</div>
-              <div class="text-xs">${a.internet_facing ? '🌐 yes' : '🔒 no'}</div>
-              <div class="text-slate-400 text-xs">${a.category || '—'}</div>
-            </div>
-          `).join('')}
-          ${data.count > 50 ? `<div class="px-4 py-2 text-xs text-slate-500">+ ${data.count - 50} more</div>` : ''}
         `;
-      });
+      }).join('');
     }
 
-    function filterAlerts(sev) {
-      document.querySelectorAll('.alert-row').forEach(row => {
-        row.style.display = (sev === 'all' || row.dataset.severity === sev) ? '' : 'none';
-      });
+    function filterAlerts() { renderAlerts(); }
+
+    async function updateAlert(id, status) {
+      const r = await adminPost('/admin/ack/' + id, { status });
+      if (r.status === 'ok') {
+        showToast(`Alert ${status.replace('_',' ')}`, true);
+        setTimeout(refreshAll, 400);
+      } else {
+        showToast('Error: ' + (r.error || 'unauthorized — check admin key in Settings'), false);
+      }
     }
 
-    function ackAlert(id) {
-      adminAPI('/admin/ack/' + id, { status: 'acked' }).then(r => {
-        showToast(r.status === 'ok' ? 'Alert acknowledged' : 'Error: ' + (r.error || 'unknown'), r.status === 'ok');
-        if (r.status === 'ok') setTimeout(refreshAll, 500);
-      });
+    async function showDetail(id) {
+      const r = await get('/api/alerts/' + id);
+      if (r.error) { showToast(r.error, false); return; }
+
+      let apps = '[]';
+      try { apps = JSON.parse(r.matched_apps || '[]'); } catch(e) {}
+
+      const html = `
+        <h3 class="text-base font-semibold mb-1">${sevBadge(r.severity)} <span class="text-xs text-slate-400 ml-2">${r.confidence} confidence</span></h3>
+        <p class="text-xs text-slate-400 mb-3">${r.event_id}</p>
+        ${r.action ? `<p class="text-sm font-medium text-cyan-400 mb-3">⚠ Action: ${r.action}</p>` : ''}
+        <p class="text-xs text-slate-500 mb-1">Matched apps: ${(r.matched_apps||'').replace(/[\[\]"]/g,'') || 'none'}</p>
+        <p class="text-xs text-slate-500 mb-1">Status: <span class="${statusColor(r.status)}">${r.status}</span> · ${r.created_at}</p>
+        <div class="exp-block text-slate-300">${r.explanation || 'No explanation available.'}</div>
+        ${r.routed_to && r.routed_to !== 'null' && r.routed_to !== '[]' ? `<p class="text-xs text-slate-500 mt-2">Routed to: ${r.routed_to}</p>` : ''}
+      `;
+      document.getElementById('detailContent').innerHTML = html;
+      document.getElementById('detail-modal').classList.add('active');
     }
 
+    // ─── Tech Stack ───
+    async function loadTechStack() {
+      const data = await get('/api/techstack');
+      if (!data || !data.apps) return;
+      document.getElementById('techstackList').innerHTML = data.apps.map(a => `
+        <div class="grid grid-cols-6 gap-2 px-4 py-2 text-sm row-hover border-b border-slate-800 items-center">
+          <div class="font-medium">${a.name}</div>
+          <div class="editable text-slate-400 text-xs" contenteditable="true" data-field="version" data-name="${a.name}" onblur="saveAppEdit(this)">${a.version || '—'}</div>
+          <div>
+            <select class="text-xs bg-transparent border-none text-slate-300" data-field="criticality" data-name="${a.name}" onchange="saveSelectEdit(this)">
+              <option value="critical" ${a.criticality==='critical'?'selected':''}>Critical</option>
+              <option value="high" ${a.criticality==='high'?'selected':''}>High</option>
+              <option value="medium" ${a.criticality==='medium'?'selected':''}>Medium</option>
+              <option value="low" ${a.criticality==='low'?'selected':''}>Low</option>
+            </select>
+          </div>
+          <div>
+            <select class="text-xs bg-transparent border-none text-slate-300" data-field="internet_facing" data-name="${a.name}" onchange="saveSelectEdit(this)">
+              <option value="true" ${a.internet_facing?'selected':''}>🌐 yes</option>
+              <option value="false" ${a.internet_facing?'':'selected'}>🔒 no</option>
+            </select>
+          </div>
+          <div class="text-slate-400 text-xs">${a.category || '—'}</div>
+          <div class="flex gap-1 justify-end">
+            <button class="btn-danger text-xs" onclick="removeApp('${a.name}')">✕</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function saveAppEdit(el) {
+      const name = el.dataset.name;
+      const field = el.dataset.field;
+      const value = field === 'version' ? (el.textContent.trim() === '—' ? '' : el.textContent.trim()) : null;
+      // Rebuild full app from existing row data, just patch the changed field
+      const data = await get('/api/techstack');
+      const app = data.apps.find(a => a.name === name);
+      if (!app) return;
+      if (field === 'version') app.version = value;
+
+      const r = await adminPut('/admin/techstack', app);
+      if (r.status === 'ok') showToast(`Updated ${name}`, true);
+      else showToast('Error: ' + (r.error || 'unauthorized'), false);
+    }
+
+    async function saveSelectEdit(el) {
+      const name = el.dataset.name;
+      const field = el.dataset.field;
+      const value = el.value;
+      const data = await get('/api/techstack');
+      const app = data.apps.find(a => a.name === name);
+      if (!app) return;
+      if (field === 'criticality') app.criticality = value;
+      if (field === 'internet_facing') app.internet_facing = value === 'true';
+
+      const r = await adminPut('/admin/techstack', app);
+      if (r.status === 'ok') showToast(`Updated ${name}`, true);
+      else showToast('Error: ' + (r.error || 'unauthorized'), false);
+    }
+
+    async function addApp() {
+      const name = document.getElementById('addName').value.trim();
+      if (!name) return showToast('Name is required', false);
+      const app = {
+        name,
+        version: document.getElementById('addVersion').value,
+        vendor: document.getElementById('addVendor').value,
+        category: document.getElementById('addCategory').value,
+        criticality: document.getElementById('addCriticality').value,
+        owner_team: document.getElementById('addOwner').value,
+        internet_facing: document.getElementById('addInternet').value === 'true',
+        hosts: document.getElementById('addHosts').value,
+        data_sensitivity: document.getElementById('addDataSens').value,
+      };
+      const r = await adminPost('/admin/techstack', app);
+      if (r.status === 'ok') {
+        showToast('Added ' + name, true);
+        document.getElementById('addAppForm').style.display = 'none';
+        loadTechStack();
+        refreshAll();
+      } else {
+        showToast('Error: ' + (r.error || 'unauthorized'), false);
+      }
+    }
+
+    async function removeApp(name) {
+      if (!confirm('Remove ' + name + ' from tech stack?')) return;
+      const r = await adminDel('/admin/techstack', { name });
+      if (r.status === 'ok') {
+        showToast('Removed ' + name, true);
+        loadTechStack();
+        refreshAll();
+      } else {
+        showToast('Error: ' + (r.error || 'unauthorized'), false);
+      }
+    }
+
+    // ─── Import CSV ───
     function handleCSV(input) {
       const file = input.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = function() {
-        fetch(API + '/admin/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/csv', 'X-Arbiter-Key': ADMIN_KEY },
-          body: reader.result
-        }).then(r => r.json()).then(data => {
-          const div = document.getElementById('importResult');
-          div.className = 'text-sm mt-3 p-3 rounded-lg ' + (data.status === 'ok' ? 'bg-emerald-900/30 text-emerald-300' : 'bg-rose-900/30 text-rose-300');
-          div.classList.remove('hidden');
-          div.textContent = `Imported ${data.imported} apps · ${data.added} added · ${data.removed} removed`;
-          if (data.status === 'ok') setTimeout(refreshAll, 500);
-        }).catch(e => {
-          showToast('Import failed: ' + e, false);
+      reader.onload = async function() {
+        const r = await fetch(API + '/admin/import', {
+          method: 'POST', headers: { 'Content-Type': 'text/csv', 'X-Arbiter-Key': ADMIN_KEY() }, body: reader.result
         });
+        const data = await r.json();
+        const div = document.getElementById('importResult');
+        div.className = 'text-sm mt-3 p-3 rounded-lg ' + (data.status === 'ok' ? 'bg-emerald-900/30 text-emerald-300' : 'bg-rose-900/30 text-rose-300');
+        div.classList.remove('hidden');
+        div.textContent = `Imported ${data.imported} apps · ${data.added} added · ${data.removed} removed`;
+        if (data.status === 'ok') { setTimeout(refreshAll, 500); loadTechStack(); }
       };
       reader.readAsText(file);
     }
 
-    function switchTab(name) {
-      ['alerts', 'import', 'techstack'].forEach(t => {
-        document.getElementById('panel-' + t).style.display = t === name ? '' : 'none';
-        const btn = document.getElementById('tab-' + t);
-        if (t === name) { btn.className = 'px-4 py-2 text-sm font-medium border-b-2 border-cyan-400 text-cyan-400'; }
-        else { btn.className = 'px-4 py-2 text-sm font-medium text-slate-500'; }
+    // ─── Settings ───
+    function saveSettings() {
+      const key = document.getElementById('settingsKey').value;
+      if (key) localStorage.setItem('arbiter_admin_key', key);
+      localStorage.setItem('arbiter_slack', document.getElementById('settingsSlack').value);
+      localStorage.setItem('arbiter_teams', document.getElementById('settingsTeams').value);
+      localStorage.setItem('arbiter_email', document.getElementById('settingsEmail').value);
+    }
+    function loadSettings() {
+      document.getElementById('settingsKey').value = localStorage.getItem('arbiter_admin_key') || '';
+      document.getElementById('settingsSlack').value = localStorage.getItem('arbiter_slack') || '';
+      document.getElementById('settingsTeams').value = localStorage.getItem('arbiter_teams') || '';
+      document.getElementById('settingsEmail').value = localStorage.getItem('arbiter_email') || '';
+    }
+    async function testSettings() {
+      const div = document.getElementById('settingsResult');
+      div.textContent = 'Testing...';
+      const r = await adminPost('/admin/pull', {});
+      div.textContent = r.status === 'ok' ? '✅ Admin key valid. Pull triggered.' : '❌ ' + (r.error || 'Failed');
+    }
+
+    // ─── Drag and drop ───
+    const dropZone = document.getElementById('dropZone');
+    if (dropZone) {
+      dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('border-cyan-400'); });
+      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-cyan-400'));
+      dropZone.addEventListener('drop', e => {
+        e.preventDefault(); dropZone.classList.remove('border-cyan-400');
+        if (e.dataTransfer.files.length) {
+          document.getElementById('csvFile').files = e.dataTransfer.files;
+          handleCSV(document.getElementById('csvFile'));
+        }
       });
     }
+
+    // ─── Modal close on backdrop click ───
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+      m.addEventListener('click', function(e) { if (e.target === m) m.classList.remove('active'); });
+    });
 
     function showToast(msg, ok) {
       const t = document.createElement('div');
@@ -249,25 +556,116 @@
       setTimeout(() => t.remove(), 3000);
     }
 
-    // Drag and drop
-    const dropZone = document.getElementById('dropZone');
-    if (dropZone) {
-      dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('border-cyan-400'); });
-      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-cyan-400'));
-      dropZone.addEventListener('drop', e => {
-        e.preventDefault();
-        dropZone.classList.remove('border-cyan-400');
-        const dt = e.dataTransfer;
-        if (dt.files.length) {
-          document.getElementById('csvFile').files = dt.files;
-          handleCSV(document.getElementById('csvFile'));
+    // ─── Auth ───
+    var currentUser = null;
+    async function checkSession() {
+      try {
+        const r = await fetch('/auth/session');
+        if (r.ok) {
+          currentUser = await r.json();
+          document.getElementById('headerUser').textContent = '👤 ' + currentUser.username + ' (' + currentUser.role + ')';
+          applyRole();
+        } else {
+          window.location.href = '/login';
         }
+      } catch(e) { window.location.href = '/login'; }
+    }
+    function applyRole() {
+      if (!currentUser) return;
+      const isAdmin = currentUser.role === 'admin';
+      document.querySelectorAll('.admin-only').forEach(el => {
+        el.style.display = isAdmin ? '' : 'none';
+      });
+      document.querySelectorAll('.reader-only').forEach(el => {
+        el.style.display = isAdmin ? 'none' : '';
       });
     }
+    async function logout() {
+      await fetch('/auth/logout', { method: 'POST' });
+      window.location.href = '/login';
+    }
 
-    // Load on start
-    refreshAll();
-    setInterval(refreshAll, 30000);
+    // ─── User Management (admin only) ───
+    async function loadUsers() {
+      const r = await fetch('/admin/users');
+      const data = await r.json();
+      if (!data.users) return;
+      document.getElementById('userList').innerHTML = data.users.map(u => `
+        <div class="grid grid-cols-4 gap-2 px-4 py-2 text-sm row-hover border-b border-slate-800 items-center">
+          <div>${u.username}</div>
+          <div><span class="badge-info text-xs px-2 py-0.5 rounded-full">${u.role}</span></div>
+          <div class="flex gap-1">
+            <button class="btn-ghost text-xs" onclick="editUser('${u.username}','${u.role}')">Edit</button>
+            <button class="btn-danger text-xs" onclick="deleteUser('${u.username}')">✕</button>
+          </div>
+          <div></div>
+        </div>
+      `).join('');
+    }
+    var editingUser = null;
+    function showAddUser() {
+      editingUser = null;
+      document.getElementById('userFormTitle').textContent = 'Add User';
+      document.getElementById('userUsername').value = '';
+      document.getElementById('userUsername').disabled = false;
+      document.getElementById('userPassword').value = '';
+      document.getElementById('userRole').value = 'reader';
+      document.getElementById('userForm').style.display = 'block';
+    }
+    function editUser(username, role) {
+      editingUser = username;
+      document.getElementById('userFormTitle').textContent = 'Edit ' + username;
+      document.getElementById('userUsername').value = username;
+      document.getElementById('userUsername').disabled = true;
+      document.getElementById('userPassword').value = '';
+      document.getElementById('userRole').value = role;
+      document.getElementById('userForm').style.display = 'block';
+    }
+    async function saveUser() {
+      const username = document.getElementById('userUsername').value.trim();
+      const password = document.getElementById('userPassword').value;
+      const role = document.getElementById('userRole').value;
+      if (!username) return;
+      const method = editingUser ? 'PUT' : 'POST';
+      const body = editingUser ? { username: editingUser, password, role } : { username, password, role };
+      const r = await fetch('/admin/users', { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      const d = await r.json();
+      if (r.ok) {
+        showToast(editingUser ? 'Updated ' + editingUser : 'Created ' + username, true);
+        document.getElementById('userForm').style.display = 'none';
+        loadUsers();
+      } else {
+        showToast('Error: ' + (d.error || 'failed'), false);
+      }
+    }
+    async function deleteUser(username) {
+      if (!confirm('Delete user ' + username + '?')) return;
+      const r = await fetch('/admin/users', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username}) });
+      if (r.ok) { showToast('Deleted ' + username, true); loadUsers(); }
+      else { const d = await r.json(); showToast('Error: ' + (d.error || 'failed'), false); }
+    }
+
+    // ─── Tabs (updated to include Users) ───
+    document.getElementById('tabs').addEventListener('click', function(e) {
+      const tab = e.target.closest('.tab');
+      if (!tab) return;
+      const name = tab.dataset.tab;
+      document.querySelectorAll('#tabs .tab').forEach(t => {
+        t.className = t.dataset.tab === name ? 'px-4 py-2 text-sm font-medium border-b-2 border-cyan-400 text-cyan-400 tab' : 'px-4 py-2 text-sm font-medium text-slate-500 tab';
+      });
+      ['alerts','import','techstack','users'].forEach(t => {
+        document.getElementById('panel-' + t).style.display = t === name ? '' : 'none';
+      });
+      if (name === 'techstack') loadTechStack();
+      if (name === 'users') loadUsers();
+    });
+
+    // ─── Startup ───
+    checkSession().then(() => {
+      loadSettings();
+      refreshAll();
+      setInterval(refreshAll, 30000);
+    });
   </script>
 </body>
 </html>
