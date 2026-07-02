@@ -80,7 +80,8 @@ Multi-user with role-based access control:
 | **reader** | View-only: alerts list, alert details, tech stack view. No write access. |
 
 - Session cookie auth (HttpOnly, SameSite=Strict), 12-hour expiry
-- Password hashing: SHA-256 + 16-byte random salt (stdlib, zero deps)
+- Password hashing: Argon2id (golang.org/x/crypto/argon2) with legacy SHA-256 upgrade on login
+- Session tokens: SHA-256 hashed at rest in SQLite
 - Default admin seeded on first start with random password (printed to stdout once)
 - Programmatic access via `X-Arbiter-Key` header (API key always has admin privileges)
 
@@ -154,7 +155,7 @@ SQLite (pure Go, no CGO). 12 tables:
 | Language | Go 1.25+ | Single binary, stdlib covers ~95% |
 | HTTP | net/http | Standard library |
 | Database | SQLite (modernc.org/sqlite) | Pure Go, zero-config, file-based |
-| Auth | crypto/sha256 + crypto/rand | Password hashing + session tokens, zero deps |
+| Auth | golang.org/x/crypto/argon2 + crypto/sha256 | Argon2id password hashing + session tokens |
 | JSON | encoding/json | Standard library |
 | SMTP | net/smtp | Standard library |
 | TLS | crypto/tls | Built into net/http |
@@ -219,7 +220,7 @@ v2 roadmap: NVD API, GitHub Advisory, vendor feeds, RSS connectors.
 | Pull-all, filter-local | Pre-filtering at MISP would miss threats. Match engine has full org context. |
 | Canonical ThreatEvent from day 1 | Adding a source = 1 normalizer. Without this = rewrite engine. |
 | Multi-user auth with admin/reader roles | SOC teams need separate logins. Self-contained in SQLite, no external IdP. |
-| SHA-256 + salt over bcrypt | Stdlib-only. Sufficient for internal tool. Upgrade path exists. |
+| Argon2id over bcrypt | golang.org/x/crypto is the closest thing to stdlib for a slow KDF. Self-describing hash format with legacy SHA-256 transparent upgrade. |
 | Custom confirm over browser confirm() | Chrome/Edge permanently suppress native confirm() — breaks delete flows. |
 | Tech stack deletion stops future, not past | Alerts are evidence. Users bulk-resolve existing alerts for removed apps. |
 | Single binary, one per org | Deploy in minutes. Multi-tenancy is v2. |

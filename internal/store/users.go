@@ -205,6 +205,12 @@ func IsLegacyHash(stored string) bool {
 	return !strings.HasPrefix(stored, "$argon2id$") && strings.Contains(stored, ":")
 }
 
+// VerifyEmpty performs an Argon2id verification against a stored hash.
+// Used as a dummy verification for nonexistent users to prevent timing-based enumeration.
+func VerifyEmpty(password, stored string) {
+	verifyArgon2(password, stored)
+}
+
 // RehashPassword re-hashes a password with Argon2id and returns the new hash.
 func RehashPassword(password string) string {
 	return hashPassword(password)

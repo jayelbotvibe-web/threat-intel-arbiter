@@ -8,7 +8,9 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/config"
 	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/model"
@@ -26,17 +28,26 @@ type Server struct {
 	ConfigDir  string
 	EventQueue chan<- model.ThreatEvent
 	limiter    *rateLimiter
+	TrustProxy bool // if true, trust X-Forwarded-For / X-Forwarded-Proto headers
 }
 
 // NewServer creates an HTTP server for the Threat Intel Arbiter API.
 func NewServer(db *store.DB, configDir string, adminKey string) *Server {
 	s := &Server{
-		DB:        db,
-		Mux:       http.NewServeMux(),
-		AdminKey:  adminKey,
-		ConfigDir: configDir,
-		limiter:   newRateLimiter(),
+		DB:         db,
+		Mux:        http.NewServeMux(),
+		AdminKey:   adminKey,
+		ConfigDir:  configDir,
+		limiter:    newRateLimiter(),
+		TrustProxy: os.Getenv("TRUSTED_PROXY") == "true",
 	}
+	// Background session cleanup every 5 minutes (not on every request)
+	go func() {
+		for {
+			time.Sleep(5 * time.Minute)
+			db.CleanExpiredSessions()
+		}
+	}()
 	s.registerRoutes()
 	return s
 }
@@ -46,6 +57,21 @@ func (s *Server) SetEventQueue(q chan<- model.ThreatEvent) {
 	s.EventQueue = q
 }
 
+// getClientIP returns the client IP, honoring TrustProxy.
+func (s *Server) getClientIP(r *http.Request) string {
+	if s.TrustProxy {
+		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+			return strings.TrimSpace(strings.Split(fwd, ",")[0])
+		}
+	}
+	return r.RemoteAddr
+}
+
+// isSecure returns true if the connection is TLS or proxied via HTTPS.
+func (s *Server) isSecure(r *http.Request) bool {
+	return r.TLS != nil || (s.TrustProxy && r.Header.Get("X-Forwarded-Proto") == "https")
+}
+
 // ListenAndServe starts the HTTP server.
 func (s *Server) ListenAndServe(addr string) error {
 	log.Printf("api: listening on %s", addr)
@@ -53,25 +79,26 @@ func (s *Server) ListenAndServe(addr string) error {
 }
 
 func (s *Server) registerRoutes() {
-	// Auth endpoints (public — no session required)
-	s.Mux.HandleFunc("/login", s.handleLogin)
-	s.Mux.HandleFunc("/auth/login", s.handleLogin)
-	s.Mux.HandleFunc("/auth/logout", s.handleLogout)
-	s.Mux.HandleFunc("/auth/session", s.handleSession)
-
-	// Dashboard (auth required)
-	dashboardHTML, _ := fs.ReadFile(dashboardFS, "dashboard.html")
-	s.Mux.HandleFunc("/", s.requireAuth(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
+	// Wrap all handlers with security headers
+	secure := func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("X-Frame-Options", "DENY")
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'")
+			next(w, r)
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(dashboardHTML)
-	}))
+	}
+	// Auth endpoints (public — no session required)
+	s.Mux.HandleFunc("/login", secure(s.handleLogin))
+	s.Mux.HandleFunc("/auth/login", secure(s.handleLogin))
+	s.Mux.HandleFunc("/auth/logout", secure(s.handleLogout))
+	s.Mux.HandleFunc("/auth/session", secure(s.handleSession))
+
+	// Dashboard
+	s.Mux.HandleFunc("/", secure(s.requireAuth(s.serveDashboard)))
 
 	// Health (public — no auth)
-	s.Mux.HandleFunc("/health", s.handleHealth)
+	s.Mux.HandleFunc("/health", secure(s.handleHealth))
 
 	// API endpoints (auth required)
 	s.Mux.HandleFunc("/api/status", s.requireAuth(s.handleStatus))
@@ -86,6 +113,17 @@ func (s *Server) registerRoutes() {
 	s.Mux.HandleFunc("/admin/pull", s.requireAuth(s.requireAdmin(s.handleAdminPull)))
 	s.Mux.HandleFunc("/admin/techstack", s.requireAuth(s.requireAdmin(s.handleAdminTechStack)))
 	s.Mux.HandleFunc("/admin/users", s.requireAuth(s.requireAdmin(s.handleAdminUsers)))
+}
+
+// serveDashboard returns the embedded dashboard HTML for authenticated users.
+func (s *Server) serveDashboard(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	html, _ := fs.ReadFile(dashboardFS, "dashboard.html")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(html)
 }
 
 // auth wraps a handler with API key authentication.

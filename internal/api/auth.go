@@ -10,6 +10,16 @@ import (
 	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/store"
 )
 
+// decoyHash is a pre-computed Argon2id hash used for constant-time verification
+// against nonexistent users to prevent username enumeration.
+const decoyHash = "$argon2id$v=19$m=65536,t=3,p=4$Xfw4b+X0NmsTPrezIPHN6w$K5KpnLWR+EzSDkYwiqI8+ezPeCmyK5pNButQTWGsaVY"
+
+// verifyArgon2Empty decodes and verifies against a stored hash without needing a DB connection.
+// Exists purely to match timing between real and dummy verification paths.
+func verifyArgon2Empty(password, stored string) {
+	store.VerifyEmpty(password, stored)
+}
+
 // ─── Auth handlers (public) ───
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -32,19 +42,25 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Per-IP rate limit first (before any DB lookup — prevents enumeration oracle)
+	ip := s.getClientIP(r)
+	if !s.limiter.allow("ip:"+ip, 50, 5*time.Minute) {
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many attempts, try again later"})
+		return
+	}
+
 	user, err := s.DB.GetUser(body.Username)
 	if err != nil || user == nil {
+		// Dummy argon2 verify so timing matches the valid-user path
+		verifyArgon2Empty("decoy", decoyHash)
+		// Still count against per-account limiter for brute-force protection
+		s.limiter.allow("user:"+body.Username, 20, 5*time.Minute)
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 		return
 	}
 
-	// Rate limiting: 10 attempts per 5 minutes per account, 20 per IP
-	ip := r.RemoteAddr
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		ip = strings.Split(fwd, ",")[0]
-	}
-	if !s.limiter.allow("user:"+body.Username, 20, 5*time.Minute) ||
-		!s.limiter.allow("ip:"+ip, 50, 5*time.Minute) {
+	// Per-account rate limit for valid users
+	if !s.limiter.allow("user:"+body.Username, 20, 5*time.Minute) {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many attempts, try again later"})
 		return
 	}
@@ -76,7 +92,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+		Secure:   s.isSecure(r),
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   12 * 3600, // 12 hours
 	})
@@ -199,7 +215,6 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		// Check session cookie first
 		_, _, ok := s.sessionFromCookie(r)
 		if ok {
-			s.DB.CleanExpiredSessions()
 			next(w, r)
 			return
 		}

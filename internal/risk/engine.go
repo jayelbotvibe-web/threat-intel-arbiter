@@ -8,6 +8,7 @@ package risk
 
 import (
 	"fmt"
+	"time"
 	"strings"
 
 	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/model"
@@ -102,8 +103,9 @@ func (e *Engine) computeLikelihood(event model.ThreatEvent, matches []model.Matc
 	}
 
 	// Freshness — published within 7 days (+1)
-	// (simplified: always +1 for test fixtures)
-	score += 1
+	if time.Since(event.Timestamp) < 7*24*time.Hour {
+		score += 1
+	}
 
 	// Clamp to max
 	if score > maxLikelihood {

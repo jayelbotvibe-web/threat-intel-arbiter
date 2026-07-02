@@ -286,8 +286,8 @@ function renderAlerts() {
   const list = document.getElementById('alertList');
   if (!f.length) { list.innerHTML = '<div style="padding:40px;text-align:center;color:#484f58">No alerts match.</div>'; return; }
   list.innerHTML = f.map(a => {
-    let ev = (a.event_id || '').length > 34 ? a.event_id.substring(0,34)+'…' : (a.event_id||'');
-    let apps = (a.matched_apps||'').replace(/[\[\]"]/g,'').substring(0,30);
+    let ev = (a.event_id || '').length > 34 ? escapeHTML(a.event_id).substring(0,34)+'...' : escapeHTML(a.event_id||'');
+    let apps = escapeHTML((a.matched_apps||'').replace(/[\[\]"]/g,'').substring(0,30);
     let acts = '';
     if (a.status === 'new' || a.status === 'acked') {
       acts = `<button class="btn" onclick="event.stopPropagation();updateAlert('${a.id}','acked')">Ack</button>
@@ -296,7 +296,7 @@ function renderAlerts() {
     }
     return `<div class="table-row" style="grid-template-columns:70px 60px 1fr 140px 80px 60px 200px" onclick="showDetail('${a.id}')">
       <div>${sevBadge(a.severity)}</div><div style="font-size:11px;color:#8b949e">${(a.confidence||'').toUpperCase()}</div>
-      <div class="mono" style="font-size:11px;color:#8b949e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.event_id}">${ev}</div>
+      <div class="mono" style="font-size:11px;color:#8b949e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(a.event_id||'')}">${ev}</div>
       <div style="font-size:11px;color:#6e7681;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${apps}</div>
       <div>${stBadge(a.status)}</div><div style="font-size:11px;color:#484f58">${(a.created_at||'').substring(11,16)}</div>
       <div style="display:flex;gap:4px">${acts}<button class="btn" onclick="event.stopPropagation();showDetail('${a.id}')" style="font-size:13px;padding:2px 6px">…</button></div>
@@ -316,9 +316,9 @@ async function showDetail(id) {
   if (r.error) { showToast(r.error, false); return; }
   document.getElementById('detailContent').innerHTML = `
     <h3 style="font-size:15px;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:6px">${sevBadge(r.severity)} <span style="font-size:11px;color:#8b949e;font-weight:400">${r.confidence} confidence</span></h3>
-    <p class="mono" style="font-size:11px;color:#484f58;margin-bottom:8px">${r.event_id}</p>
-    ${r.action ? '<p style="font-size:12px;font-weight:600;color:#f78166;margin-bottom:8px">Action: ' + r.action + '</p>' : ''}
-    <p style="font-size:11px;color:#6e7681;margin-bottom:8px">Apps: ${(r.matched_apps||'').replace(/[\[\]"]/g,'') || 'none'} · ${stBadge(r.status)} · ${r.created_at}</p>
+    <p class="mono" style="font-size:11px;color:#484f58;margin-bottom:8px">${escapeHTML(r.event_id)}</p>
+    ${r.action ? '<p style="font-size:12px;font-weight:600;color:#f78166;margin-bottom:8px">Action: ' + escapeHTML(r.action) + '</p>' : ''}
+    <p style="font-size:11px;color:#6e7681;margin-bottom:8px">Apps: ${escapeHTML((r.matched_apps||'').replace(/[\[\]"]/g,'') || 'none')} · ${stBadge(r.status)} · ${r.created_at}</p>
     <div class="exp-block">${escapeHTML(r.explanation) || 'No explanation available.'}</div>`;
   document.getElementById('detail-modal').classList.add('active');
 }
@@ -339,7 +339,7 @@ async function loadTechStack() {
         <option value="true" ${a.internet_facing?'selected':''}>Internet</option><option value="false" ${a.internet_facing?'':'selected'}>Internal</option>
       </select></div>
       <div style="font-size:11px;color:#6e7681">${a.category || '—'}</div>
-      <div style="text-align:right"><button class="btn btn-danger admin-only" onclick="removeApp('${a.name}')" style="padding:2px 8px;font-size:13px">×</button></div>
+      <div style="text-align:right"><button class="btn btn-danger admin-only" onclick="removeApp(escapeHTML('${a.name}'))" style="padding:2px 8px;font-size:13px">×</button></div>
     </div>`).join('');
 }
 async function saveAppEdit(el) {

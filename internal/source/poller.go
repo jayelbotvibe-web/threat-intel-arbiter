@@ -59,8 +59,10 @@ func (p *MISPPoller) poll(ctx context.Context) error {
 	}
 
 	// Pagination loop: fetch up to 5 pages of 100 events each
+	var maxTimestamp int64
 	totalPulled := 0
 	const maxPages = 5
+	lastPageFull := false
 	for page := 0; page < maxPages; page++ {
 		events, err := p.Client.FetchEvents(since, 100, page)
 		if err != nil {
@@ -70,6 +72,7 @@ func (p *MISPPoller) poll(ctx context.Context) error {
 			break
 		}
 		totalPulled += len(events)
+		lastPageFull = len(events) == 100
 		log.Printf("misp poller: pulled %d events (page %d, total %d)", len(events), page, totalPulled)
 
 		// Process each event: normalize, check for new/modified/deleted
@@ -81,6 +84,9 @@ func (p *MISPPoller) poll(ctx context.Context) error {
 			}
 
 			normalized := NormalizeMISPEvent(raw)
+			if normalized.Timestamp.Unix() > maxTimestamp {
+				maxTimestamp = normalized.Timestamp.Unix()
+			}
 			existing, err := p.getStoredEvent(normalized.ID)
 			if err != nil {
 				log.Printf("misp poller: check existing event %s: %v", normalized.ID, err)
@@ -103,8 +109,6 @@ func (p *MISPPoller) poll(ctx context.Context) error {
 				case p.Events <- normalized:
 				case <-ctx.Done():
 					return ctx.Err()
-				default:
-					log.Printf("misp poller: event queue full, dropping event %s", normalized.ID)
 				}
 			}
 		}
@@ -114,8 +118,14 @@ func (p *MISPPoller) poll(ctx context.Context) error {
 		}
 	}
 
-	// Update cursor to now (always, even if 0 events — we checked up to this point)
-	p.setCursor(fmt.Sprintf("%d", time.Now().Unix()))
+	// Update cursor: only advance to now if we caught up (last page was short).
+	// Otherwise advance to the max processed timestamp to avoid skipping events.
+	if lastPageFull && maxTimestamp > 0 {
+		p.setCursor(fmt.Sprintf("%d", maxTimestamp))
+		log.Printf("misp poller: hit page limit (maxPages=%d), cursor set to max event ts %d (not now)", maxPages, maxTimestamp)
+	} else {
+		p.setCursor(fmt.Sprintf("%d", time.Now().Unix()))
+	}
 	if p.ColdStart {
 		log.Printf("misp poller: cold start complete, next poll will be incremental")
 		p.ColdStart = false
