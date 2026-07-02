@@ -247,10 +247,14 @@ func NormalizeMISPEvent(raw MISPEvent) model.ThreatEvent {
 		// Extract IOCs for EDR integration
 		iocType := mapMISPToIOCType(attr.Type)
 		if iocType != "" && attr.Value != "" {
+			desc := attr.Comment
+			if desc == "" {
+				desc = raw.Info
+			}
 			event.IOCs = append(event.IOCs, model.IOC{
 				Type:        iocType,
 				Value:       attr.Value,
-				Description: raw.Info,
+				Description: desc,
 				Source:      "misp",
 				Tags:        eventTags(attr.Tags),
 			})
