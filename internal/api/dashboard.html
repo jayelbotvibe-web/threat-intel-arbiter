@@ -4,668 +4,554 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Threat Intel Arbiter</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; }
-    .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 1.25rem; }
-    .stat-num { font-size: 2rem; font-weight: 700; }
-    .row-hover:hover { background: rgba(30,41,59,0.5); }
-    .badge-crit { background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
-    .badge-high { background: #7c2d12; color: #fdba74; border: 1px solid #9a3412; }
-    .badge-med  { background: #713f12; color: #fde047; border: 1px solid #854d0e; }
-    .badge-low  { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
-    .badge-info { background: #1e3a5f; color: #7dd3fc; border: 1px solid #1e40af; }
-    .btn-primary { background: #0e7490; color: white; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; }
-    .btn-danger { background: #9f1239; color: #fda4af; border: 1px solid #be123c; border-radius: 6px; padding: 5px 12px; font-size: 11px; }
-    .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #475569; border-radius: 6px; padding: 5px 12px; font-size: 11px; }
-    button { cursor: pointer; transition: all 0.15s; }
-    button:hover { filter: brightness(1.2); }
-    .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-weight: 600; z-index: 100; animation: fadeIn 0.3s; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .detail-panel { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-top: 4px; }
-    .exp-block { background: #1e293b; border-radius: 6px; padding: 12px; margin-top: 8px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
-    .health-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-    .health-dot.ok { background: #22c55e; }
-    .health-dot.warn { background: #f59e0b; }
-    .health-dot.err { background: #ef4444; }
-    input, select { background: #1e293b; border: 1px solid #475569; color: #e2e8f0; border-radius: 6px; padding: 6px 10px; font-size: 12px; }
-    input:focus, select:focus { outline: none; border-color: #22d3ee; }
-    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 50; align-items: center; justify-content: center; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #0a0e14; color: #c9d1d9; -webkit-font-smoothing: antialiased; font-size: 13px; line-height: 1.5; }
+    
+    /* Layout */
+    .container { max-width: 1280px; margin: 0 auto; padding: 20px 24px; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    
+    /* Cards */
+    .card { background: #12171e; border: 1px solid #1c2128; border-radius: 6px; padding: 16px; }
+    
+    /* Stat cards */
+    .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px; }
+    .stat-card { background: #12171e; border: 1px solid #1c2128; border-radius: 6px; padding: 14px 16px; transition: border-color 0.15s; }
+    .stat-card:hover { border-color: #30363d; }
+    .stat-num { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
+    .stat-label { font-size: 11px; color: #6e7681; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+    .stat-crit .stat-num { color: #f85149; }
+    .stat-high .stat-num { color: #d29922; }
+    .stat-med .stat-num { color: #d29922; }
+    .stat-low .stat-num { color: #6e7681; }
+    .stat-apps .stat-num { color: #58a6ff; }
+    
+    /* Badges */
+    .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; letter-spacing: 0.3px; }
+    .badge-crit { color: #f85149; background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.25); }
+    .badge-high { color: #d29922; background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.25); }
+    .badge-med  { color: #d29922; background: rgba(210,153,34,0.08); border: 1px solid rgba(210,153,34,0.18); }
+    .badge-low  { color: #6e7681; background: rgba(110,118,129,0.1); border: 1px solid rgba(110,118,129,0.2); }
+    .badge-info { color: #58a6ff; background: rgba(88,166,255,0.1); border: 1px solid rgba(88,166,255,0.2); }
+    
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 5px 12px; border-radius: 5px; cursor: pointer; transition: all 0.12s; border: 1px solid transparent; background: none; color: #8b949e; }
+    .btn:hover { color: #c9d1d9; background: #1c2128; border-color: #30363d; }
+    .btn-primary { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+    .btn-primary:hover { background: #388bfd; border-color: #388bfd; }
+    .btn-danger { color: #f85149; }
+    .btn-danger:hover { color: #ff7b72; background: rgba(248,81,73,0.1); border-color: rgba(248,81,73,0.3); }
+    
+    /* Table */
+    .table-header { display: grid; grid-template-columns: 70px 60px 1fr 140px 80px 60px 200px; gap: 8px; padding: 8px 14px; font-size: 10px; color: #6e7681; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; border-bottom: 1px solid #1c2128; }
+    .table-row { display: grid; grid-template-columns: 70px 60px 1fr 140px 80px 60px 200px; gap: 8px; padding: 10px 14px; align-items: center; font-size: 12px; border-bottom: 1px solid #161b22; transition: background 0.1s; cursor: pointer; }
+    .table-row:hover { background: #161b22; }
+    .table-row .event-id { font-family: "SF Mono", "Fira Code", "Consolas", monospace; font-size: 11px; color: #8b949e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .table-row .apps { font-size: 11px; color: #6e7681; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .table-row .time { font-size: 11px; color: #484f58; }
+    
+    /* Health bar */
+    .health-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; padding: 8px 14px; background: #12171e; border: 1px solid #1c2128; border-radius: 6px; font-size: 11px; }
+    .health-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    .health-dot.ok { background: #3fb950; }
+    .health-dot.warn { background: #d29922; }
+    .health-dot.err { background: #f85149; }
+    
+    /* Tabs */
+    .tabs { display: flex; gap: 0; margin-bottom: 14px; border-bottom: 1px solid #1c2128; }
+    .tab { padding: 8px 16px; font-size: 12px; font-weight: 500; color: #6e7681; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.12s; }
+    .tab:hover { color: #c9d1d9; }
+    .tab.active { color: #58a6ff; border-bottom-color: #f78166; }
+    
+    /* Inputs */
+    input, select { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 5px; padding: 6px 10px; font-size: 12px; transition: border-color 0.15s; }
+    input:focus, select:focus { outline: none; border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.15); }
+    input::placeholder { color: #484f58; }
+    
+    /* Modals */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 50; align-items: center; justify-content: center; }
     .modal-overlay.active { display: flex; }
-    .modal-box { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.5rem; max-width: 560px; width: 100%; max-height: 80vh; overflow-y: auto; }
-    .editable { border-bottom: 1px dashed #475569; cursor: pointer; }
-    .editable:hover { border-bottom-color: #22d3ee; }
+    .modal-box { background: #12171e; border: 1px solid #30363d; border-radius: 8px; padding: 20px; max-width: 580px; width: 100%; max-height: 82vh; overflow-y: auto; }
+    
+    /* Misc */
+    .editable { border-bottom: 1px dashed #30363d; cursor: pointer; padding: 1px 3px; border-radius: 2px; transition: all 0.1s; }
+    .editable:hover { border-bottom-color: #58a6ff; }
+    .editable:focus { outline: none; border-bottom: 1px solid #58a6ff; background: rgba(88,166,255,0.05); }
+    .exp-block { background: #0d1117; border: 1px solid #1c2128; border-radius: 5px; padding: 12px; font-size: 12px; line-height: 1.65; white-space: pre-wrap; color: #8b949e; }
+    .toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.5); animation: slideUp 0.25s ease; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .pulse { animation: pulse 2.5s ease-in-out infinite; }
+    .text-muted { color: #6e7681; }
+    .text-faint { color: #484f58; }
+    .mono { font-family: "SF Mono", "Fira Code", "Consolas", monospace; }
+    
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0d1117; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
   </style>
 </head>
-<body class="p-6">
-  <div class="max-w-7xl mx-auto">
+<body>
+<div class="container">
 
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-      <div class="flex items-center gap-3">
-        <div class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" id="statusDot"></div>
-        <h1 class="text-2xl font-bold tracking-tight">Threat Intel Arbiter</h1>
+  <header>
+    <div class="header-left">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="6" fill="#1f6feb"/><path d="M12 6v12M6 12h12" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+      <div>
+        <h1 style="font-size:15px;font-weight:700;letter-spacing:-0.2px">Threat Intel Arbiter</h1>
+        <p style="font-size:10px;color:#484f58">Threat Prioritization Engine</p>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-cyan-400" id="headerUser"></span>
-        <span class="text-xs text-slate-400" id="lastUpdate">—</span>
-        <button onclick="refreshAll()" class="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600">🔄 Refresh</button>
-        <button onclick="document.getElementById('settings-modal').classList.add('active')" class="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 admin-only">⚙ Settings</button>
-        <button onclick="logout()" class="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600">🚪 Logout</button>
-      </div>
+      <div class="w-2 h-2 rounded-full pulse" style="background:#3fb950;margin-left:4px"></div>
     </div>
-
-    <!-- Health Bar -->
-    <div class="flex items-center gap-6 mb-4 px-4 py-2 bg-slate-800/50 rounded-lg border border-slate-700 text-xs" id="healthBar">
-      <span class="text-slate-400">System:</span>
-      <span><span class="health-dot ok" id="hMisp"></span>MISP <span id="hMispText">—</span></span>
-      <span><span class="health-dot ok" id="hKev"></span>KEV <span id="hKevText">—</span></span>
-      <span><span class="health-dot ok" id="hNew"></span><span id="hNewCount">0</span> new alerts</span>
-      <span class="flex-1"></span>
-      <span class="text-slate-500" id="hCursor">—</span>
+    <div class="header-right">
+      <span style="font-size:11px;color:#58a6ff" id="headerUser"></span>
+      <span class="text-faint" style="font-size:11px" id="lastUpdate">—</span>
+      <button onclick="refreshAll()" class="btn">↻ Refresh</button>
+      <button onclick="document.getElementById('settings-modal').classList.add('active')" class="btn admin-only">Settings</button>
+      <button onclick="logout()" class="btn">Log out</button>
     </div>
+  </header>
 
-    <!-- Stat Bar -->
-    <div class="grid grid-cols-5 gap-4 mb-6">
-      <div class="card text-center">
-        <div class="stat-num text-rose-400" id="statCritical">—</div>
-        <div class="text-xs text-slate-400 mt-1">Critical</div>
-      </div>
-      <div class="card text-center">
-        <div class="stat-num text-amber-400" id="statHigh">—</div>
-        <div class="text-xs text-slate-400 mt-1">High</div>
-      </div>
-      <div class="card text-center">
-        <div class="stat-num text-yellow-400" id="statMedium">—</div>
-        <div class="text-xs text-slate-400 mt-1">Medium</div>
-      </div>
-      <div class="card text-center">
-        <div class="stat-num text-slate-400" id="statLow">—</div>
-        <div class="text-xs text-slate-400 mt-1">Low</div>
-      </div>
-      <div class="card text-center">
-        <div class="stat-num text-cyan-400" id="statApps">—</div>
-        <div class="text-xs text-slate-400 mt-1">Apps Tracked</div>
-      </div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="flex gap-0 mb-4 border-b border-slate-700" id="tabs">
-      <button class="px-4 py-2 text-sm font-medium border-b-2 border-cyan-400 text-cyan-400 tab" data-tab="alerts">Alerts</button>
-      <button class="px-4 py-2 text-sm font-medium text-slate-500 tab admin-only" data-tab="import">Import CSV</button>
-      <button class="px-4 py-2 text-sm font-medium text-slate-500 tab" data-tab="techstack">Tech Stack</button>
-      <button class="px-4 py-2 text-sm font-medium text-slate-500 tab admin-only" data-tab="users">Users</button>
-    </div>
-
-    <!-- Alerts Tab -->
-    <div id="panel-alerts">
-      <!-- Search + Filters -->
-      <div class="flex items-center gap-2 mb-3 flex-wrap">
-        <input class="w-56" placeholder="🔍 Search CVE, event, explanation..." id="alertSearch" oninput="filterAlerts()">
-        <select id="filterStatus" onchange="filterAlerts()" class="w-32">
-          <option value="">All statuses</option>
-          <option value="new">New</option>
-          <option value="acked">Acknowledged</option>
-          <option value="false_pos">False Positive</option>
-          <option value="resolved">Resolved</option>
-        </select>
-        <select id="filterSev" onchange="filterAlerts()" class="w-28">
-          <option value="">All severity</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
-        <input class="w-40" placeholder="Filter by app..." id="filterApp" oninput="filterAlerts()">
-        <div class="flex-1"></div>
-        <span id="alertCount" class="text-xs text-slate-500"></span>
-      </div>
-      <div class="card p-0 overflow-hidden">
-        <div class="grid grid-cols-12 gap-2 px-4 py-2 text-xs text-slate-500 border-b border-slate-700 font-medium">
-          <div class="col-span-1">Sev</div>
-          <div class="col-span-1">Conf</div>
-          <div class="col-span-2">Event</div>
-          <div class="col-span-2">Matched Apps</div>
-          <div class="col-span-1">Status</div>
-          <div class="col-span-1">Time</div>
-          <div class="col-span-4">Actions</div>
-        </div>
-        <div id="alertList">
-          <div class="px-4 py-8 text-center text-slate-500">Loading alerts...</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Import Tab -->
-    <div id="panel-import" style="display:none">
-      <div class="card max-w-2xl">
-        <h2 class="text-lg font-semibold mb-2">Import Tech Stack CSV</h2>
-        <p class="text-xs text-slate-400 mb-4">Upload a CSV with columns: name, version, vendor, category, criticality, owner_team, internet_facing, hosts, data_sensitivity</p>
-        <div class="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center mb-4" id="dropZone">
-          <p class="text-slate-400 mb-3">Drop CSV file here or click to select</p>
-          <input type="file" accept=".csv" id="csvFile" class="hidden" onchange="handleCSV(this)">
-          <button onclick="document.getElementById('csvFile').click()" class="btn-primary">Choose File</button>
-        </div>
-        <div id="importResult" class="hidden text-sm"></div>
-      </div>
-    </div>
-
-    <!-- Tech Stack Tab -->
-    <div id="panel-techstack" style="display:none">
-      <!-- Add new app -->
-      <div class="card mb-4" id="addAppForm" style="display:none">
-        <h3 class="text-sm font-semibold mb-3">Add Application</h3>
-        <div class="grid grid-cols-4 gap-2">
-          <input placeholder="Name *" id="addName">
-          <input placeholder="Version" id="addVersion">
-          <input placeholder="Vendor" id="addVendor">
-          <input placeholder="Category" id="addCategory">
-          <select id="addCriticality"><option value="medium">Medium</option><option value="critical">Critical</option><option value="high">High</option><option value="low">Low</option></select>
-          <input placeholder="Owner team" id="addOwner">
-          <select id="addInternet"><option value="false">Internal</option><option value="true">Internet-facing</option></select>
-          <input placeholder="Hosts" id="addHosts">
-          <select id="addDataSens"><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option><option value="low">Low</option></select>
-        </div>
-        <div class="flex gap-2 mt-3">
-          <button class="btn-primary" onclick="addApp()">✓ Add</button>
-          <button class="btn-ghost" onclick="document.getElementById('addAppForm').style.display='none'">Cancel</button>
-        </div>
-      </div>
-      <div class="flex items-center gap-2 mb-3">
-        <button class="btn-primary" onclick="document.getElementById('addAppForm').style.display='block'">+ Add App</button>
-        <span class="text-xs text-slate-400 admin-only">Click any row to edit (admin). Changes save on blur.</span>
-        <span class="text-xs text-slate-400 reader-only" style="display:none">Read-only view. Contact admin to modify.</span>
-      </div>
-      <div class="card p-0 overflow-hidden">
-        <div class="grid grid-cols-6 gap-2 px-4 py-2 text-xs text-slate-500 border-b border-slate-700 font-medium">
-          <div>Application</div><div>Version</div><div>Criticality</div><div>Internet</div><div>Category</div><div></div>
-        </div>
-        <div id="techstackList">
-          <div class="px-4 py-8 text-center text-slate-500">Loading...</div>
-        </div>
-      </div>
-    </div>
-
+  <!-- Health -->
+  <div class="health-bar">
+    <span class="text-muted" style="letter-spacing:0.4px;text-transform:uppercase;font-size:10px">System</span>
+    <span><span class="health-dot ok" id="hMisp"></span><span id="hMispText" class="text-muted">—</span></span>
+    <span><span class="health-dot ok" id="hKev"></span><span id="hKevText" class="text-muted">—</span></span>
+    <span><span class="health-dot ok" id="hNew"></span><span id="hNewCount">0</span> <span class="text-muted">new</span></span>
+    <span style="flex:1"></span>
+    <span class="text-faint" style="font-size:10px" id="hCursor">—</span>
   </div>
 
-  <!-- Users Panel (admin only) -->
+  <!-- Stats -->
+  <div class="stat-grid">
+    <div class="stat-card stat-crit"><div class="stat-num" id="statCritical">—</div><div class="stat-label">Critical</div></div>
+    <div class="stat-card stat-high"><div class="stat-num" id="statHigh">—</div><div class="stat-label">High</div></div>
+    <div class="stat-card stat-med"><div class="stat-num" id="statMedium">—</div><div class="stat-label">Medium</div></div>
+    <div class="stat-card stat-low"><div class="stat-num" id="statLow">—</div><div class="stat-label">Low</div></div>
+    <div class="stat-card stat-apps"><div class="stat-num" id="statApps">—</div><div class="stat-label">Apps Tracked</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="alerts">Alerts</button>
+    <button class="tab admin-only" data-tab="import">Import</button>
+    <button class="tab" data-tab="techstack">Tech Stack</button>
+    <button class="tab admin-only" data-tab="users">Users</button>
+  </div>
+
+  <!-- Alerts -->
+  <div id="panel-alerts">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <input style="width:220px" placeholder="Search CVE, event, explanation…" id="alertSearch" oninput="filterAlerts()">
+      <select id="filterStatus" onchange="filterAlerts()" style="width:130px"><option value="">All statuses</option><option value="new">New</option><option value="acked">Acknowledged</option><option value="false_pos">False Positive</option><option value="resolved">Resolved</option></select>
+      <select id="filterSev" onchange="filterAlerts()" style="width:120px"><option value="">All severity</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+      <input style="width:160px" placeholder="Filter by app…" id="filterApp" oninput="filterAlerts()">
+      <span style="flex:1"></span>
+      <span style="font-size:11px;color:#484f58" id="alertCount"></span>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="table-header"><span>Severity</span><span>Conf</span><span>Event</span><span>Apps</span><span>Status</span><span>Time</span><span>Actions</span></div>
+      <div id="alertList"><div style="padding:40px;text-align:center;color:#484f58">Loading alerts…</div></div>
+    </div>
+  </div>
+
+  <!-- Import -->
+  <div id="panel-import" style="display:none">
+    <div class="card" style="max-width:560px">
+      <h2 style="font-size:14px;font-weight:600;margin-bottom:4px">Import Tech Stack</h2>
+      <p style="font-size:11px;color:#6e7681;margin-bottom:12px">CSV: name, version, vendor, category, criticality, owner_team, internet_facing, hosts, data_sensitivity</p>
+      <div id="dropZone" style="border:2px dashed #1c2128;border-radius:8px;padding:32px;text-align:center;margin-bottom:12px;transition:border-color 0.15s;background:#0d1117">
+        <p style="color:#6e7681;margin-bottom:8px;font-size:12px">Drop CSV here or click to browse</p>
+        <input type="file" accept=".csv" id="csvFile" style="display:none" onchange="handleCSV(this)">
+        <button onclick="document.getElementById('csvFile').click()" class="btn btn-primary">Choose File</button>
+      </div>
+      <div id="importResult" style="display:none;font-size:12px"></div>
+    </div>
+  </div>
+
+  <!-- Tech Stack -->
+  <div id="panel-techstack" style="display:none">
+    <div class="card" id="addAppForm" style="display:none;margin-bottom:10px">
+      <h3 style="font-size:13px;font-weight:600;margin-bottom:10px">Add Application</h3>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+        <input placeholder="Name *" id="addName"><input placeholder="Version" id="addVersion">
+        <input placeholder="Vendor" id="addVendor"><input placeholder="Category" id="addCategory">
+        <select id="addCriticality"><option value="medium">Medium</option><option value="critical">Critical</option><option value="high">High</option><option value="low">Low</option></select>
+        <input placeholder="Owner team" id="addOwner">
+        <select id="addInternet"><option value="false">Internal</option><option value="true">Internet-facing</option></select>
+        <input placeholder="Hosts" id="addHosts">
+        <select id="addDataSens"><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option><option value="low">Low</option></select>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn btn-primary" onclick="addApp()">Add</button>
+        <button class="btn" onclick="document.getElementById('addAppForm').style.display='none'">Cancel</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <button class="btn btn-primary admin-only" onclick="document.getElementById('addAppForm').style.display='block'">+ Add App</button>
+      <span style="font-size:11px;color:#6e7681" class="admin-only">Click any row to edit.</span>
+      <span style="font-size:11px;color:#6e7681" class="reader-only" style="display:none">Read-only view</span>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="table-header" style="grid-template-columns:1fr 100px 100px 100px 100px 40px"><span>Application</span><span>Version</span><span>Criticality</span><span>Internet</span><span>Category</span><span></span></div>
+      <div id="techstackList"><div style="padding:40px;text-align:center;color:#484f58">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Users -->
   <div id="panel-users" style="display:none">
-    <div class="flex items-center gap-2 mb-3">
-      <button class="btn-primary" onclick="showAddUser()">+ Add User</button>
+    <div style="margin-bottom:10px"><button class="btn btn-primary" onclick="showAddUser()">+ Add User</button></div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="table-header" style="grid-template-columns:1fr 80px 120px"><span>Username</span><span>Role</span><span>Actions</span></div>
+      <div id="userList"><div style="padding:40px;text-align:center;color:#484f58">Loading…</div></div>
     </div>
-    <div class="card p-0 overflow-hidden">
-      <div class="grid grid-cols-4 gap-2 px-4 py-2 text-xs text-slate-500 border-b border-slate-700 font-medium">
-        <div>Username</div><div>Role</div><div>Actions</div><div></div>
-      </div>
-      <div id="userList"><div class="px-4 py-8 text-center text-slate-500">Loading...</div></div>
-    </div>
-    <!-- Add/Edit User Form -->
-    <div class="card mt-3" id="userForm" style="display:none">
-      <h3 class="text-sm font-semibold mb-2" id="userFormTitle">Add User</h3>
-      <input class="w-full mb-2" id="userUsername" placeholder="Username">
-      <input class="w-full mb-2" type="password" id="userPassword" placeholder="Password">
-      <select class="w-full mb-3" id="userRole"><option value="reader">Reader</option><option value="admin">Admin</option></select>
-      <div class="flex gap-2">
-        <button class="btn-primary" onclick="saveUser()">Save</button>
-        <button class="btn-ghost" onclick="document.getElementById('userForm').style.display='none'">Cancel</button>
+    <div class="card" id="userForm" style="display:none;margin-top:10px">
+      <h3 style="font-size:13px;font-weight:600;margin-bottom:10px" id="userFormTitle">Add User</h3>
+      <input style="width:100%;margin-bottom:6px" id="userUsername" placeholder="Username">
+      <input style="width:100%;margin-bottom:6px" type="password" id="userPassword" placeholder="Password">
+      <select style="width:100%;margin-bottom:8px" id="userRole"><option value="reader">Reader</option><option value="admin">Admin</option></select>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-primary" onclick="saveUser()">Save</button>
+        <button class="btn" onclick="document.getElementById('userForm').style.display='none'">Cancel</button>
       </div>
     </div>
   </div>
 
-  <!-- Settings Modal -->
-  <div class="modal-overlay" id="settings-modal">
-    <div class="modal-box">
-      <h2 class="text-lg font-semibold mb-4">⚙ Settings</h2>
-      <label class="block text-xs text-slate-400 mb-1">Admin API Key (required for any change)</label>
-      <input class="w-full mb-3" type="password" id="settingsKey" placeholder="Enter admin key..." onchange="saveSettings()">
-      <label class="block text-xs text-slate-400 mb-1">Slack Webhook URL</label>
-      <input class="w-full mb-3" id="settingsSlack" placeholder="https://hooks.slack.com/..." onchange="saveSettings()">
-      <label class="block text-xs text-slate-400 mb-1">Teams Webhook URL</label>
-      <input class="w-full mb-3" id="settingsTeams" placeholder="https://..." onchange="saveSettings()">
-      <label class="block text-xs text-slate-400 mb-1">Email (SMTP target)</label>
-      <input class="w-full mb-4" id="settingsEmail" placeholder="soc@company.com" onchange="saveSettings()">
-      <div class="flex gap-2">
-        <button class="btn-primary" onclick="testSettings()">Test Notifications</button>
-        <button class="btn-ghost" onclick="document.getElementById('settings-modal').classList.remove('active')">Close</button>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal-box">
+    <h2 style="font-size:14px;font-weight:600;margin-bottom:12px">Settings</h2>
+    <label style="display:block;font-size:11px;color:#6e7681;margin-bottom:2px">Admin API Key</label>
+    <input style="width:100%;margin-bottom:8px" type="password" id="settingsKey" placeholder="Enter admin key…" onchange="saveSettings()">
+    <label style="display:block;font-size:11px;color:#6e7681;margin-bottom:2px">Slack Webhook URL</label>
+    <input style="width:100%;margin-bottom:8px" id="settingsSlack" placeholder="https://hooks.slack.com/…" onchange="saveSettings()">
+    <label style="display:block;font-size:11px;color:#6e7681;margin-bottom:2px">Teams Webhook URL</label>
+    <input style="width:100%;margin-bottom:8px" id="settingsTeams" placeholder="https://…" onchange="saveSettings()">
+    <label style="display:block;font-size:11px;color:#6e7681;margin-bottom:2px">Email (SMTP target)</label>
+    <input style="width:100%;margin-bottom:12px" id="settingsEmail" placeholder="soc@company.com" onchange="saveSettings()">
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-primary" onclick="testSettings()">Test Connection</button>
+      <button class="btn" onclick="document.getElementById('settings-modal').classList.remove('active')">Close</button>
+    </div>
+    <div id="settingsResult" style="font-size:11px;margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal-box" style="max-width:720px">
+    <div id="detailContent"></div>
+    <button class="btn" style="margin-top:12px" onclick="document.getElementById('detail-modal').classList.remove('active')">Close</button>
+  </div>
+</div>
+
+<script>
+const API = '';
+const AK = () => localStorage.getItem('arbiter_admin_key') || '';
+
+async function get(p) { const r = await fetch(API + p); return r.json(); }
+async function adm(method, p, body) {
+  const r = await fetch(API + p, { method, headers: { 'Content-Type': 'application/json', 'X-Arbiter-Key': AK() }, body: JSON.stringify(body) });
+  return r.json();
+}
+
+function sevBadge(s) {
+  const m = { critical: 'badge-crit', high: 'badge-high', medium: 'badge-med', low: 'badge-low' };
+  return `<span class="badge ${m[s]||'badge-low'}">${(s||'').toUpperCase().substring(0,4)}</span>`;
+}
+function stBadge(s) {
+  const m = { new: '#f85149', acked: '#d29922', false_pos: '#bc8cff', resolved: '#3fb950' };
+  return `<span style="color:${m[s]||'#6e7681'};font-size:11px">${s}</span>`;
+}
+
+var allAlerts = [];
+async function refreshAll() {
+  const [stats, alerts, health] = await Promise.all([get('/api/stats'), get('/api/alerts'), get('/health')]);
+  if (stats && stats.alerts) {
+    document.getElementById('statCritical').textContent = stats.alerts.critical || 0;
+    document.getElementById('statHigh').textContent = stats.alerts.high || 0;
+    document.getElementById('statMedium').textContent = stats.alerts.medium || 0;
+    document.getElementById('statLow').textContent = stats.alerts.low || 0;
+    document.getElementById('statApps').textContent = stats.apps_tracked || 0;
+  }
+  if (health) {
+    const d = health.last_misp_pull ? new Date(parseInt(health.last_misp_pull) * 1000) : null;
+    document.getElementById('hMispText').textContent = d ? 'MISP ' + d.toLocaleString() : 'MISP — no pull';
+    document.getElementById('hMisp').className = 'health-dot ' + (d ? 'ok' : 'warn');
+    document.getElementById('hKevText').textContent = 'KEV ' + (health.kev_entries || 0) + ' entries';
+    document.getElementById('hKev').className = 'health-dot ' + ((health.kev_entries || 0) > 0 ? 'ok' : 'warn');
+    document.getElementById('hNewCount').textContent = (health.alerts_new || 0) + ' ';
+    document.getElementById('hNew').className = 'health-dot ' + ((health.alerts_new || 0) > 0 ? 'warn' : 'ok');
+    if (d) document.getElementById('hCursor').textContent = 'Last MISP: ' + d.toLocaleString();
+  }
+  allAlerts = (alerts && alerts.alerts) ? alerts.alerts : [];
+  document.getElementById('lastUpdate').textContent = 'just now';
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const q = (document.getElementById('alertSearch').value || '').toLowerCase();
+  const st = document.getElementById('filterStatus').value;
+  const sv = document.getElementById('filterSev').value;
+  const ap = (document.getElementById('filterApp').value || '').toLowerCase();
+  let f = allAlerts;
+  if (q) f = f.filter(a => (a.event_id||'').toLowerCase().includes(q) || (a.explanation||'').toLowerCase().includes(q));
+  if (st) f = f.filter(a => a.status === st);
+  if (sv) f = f.filter(a => a.severity === sv);
+  if (ap) f = f.filter(a => (a.matched_apps||'').toLowerCase().includes(ap));
+  document.getElementById('alertCount').textContent = `Showing ${f.length}/${allAlerts.length}`;
+
+  const list = document.getElementById('alertList');
+  if (!f.length) { list.innerHTML = '<div style="padding:40px;text-align:center;color:#484f58">No alerts match.</div>'; return; }
+  list.innerHTML = f.map(a => {
+    let ev = (a.event_id || '').length > 34 ? a.event_id.substring(0,34)+'…' : (a.event_id||'');
+    let apps = (a.matched_apps||'').replace(/[\[\]"]/g,'').substring(0,30);
+    let actions = '';
+    if (a.status === 'new' || a.status === 'acked') {
+      actions = `<button class="btn" onclick="event.stopPropagation();updateAlert('${a.id}','acked')">Ack</button>
+        <button class="btn btn-danger" onclick="event.stopPropagation();updateAlert('${a.id}','false_pos')">False Pos</button>
+        <button class="btn" onclick="event.stopPropagation();updateAlert('${a.id}','resolved')">Resolve</button>`;
+    }
+    return `<div class="table-row" onclick="showDetail('${a.id}')">
+      <div>${sevBadge(a.severity)}</div>
+      <div style="font-size:11px;color:#8b949e">${(a.confidence||'').toUpperCase()}</div>
+      <div class="event-id" title="${a.event_id}">${ev}</div>
+      <div class="apps">${apps}</div>
+      <div>${stBadge(a.status)}</div>
+      <div class="time">${(a.created_at||'').substring(11,16)}</div>
+      <div style="display:flex;gap:4px">${actions}<button class="btn" onclick="event.stopPropagation();showDetail('${a.id}')" style="font-size:13px;padding:2px 6px">…</button></div>
+    </div>`;
+  }).join('');
+}
+function filterAlerts() { renderAlerts(); }
+
+async function updateAlert(id, status) {
+  const r = await adm('POST', '/admin/ack/' + id, { status });
+  if (r.status === 'ok') { setTimeout(refreshAll, 300); showToast('Alert ' + status.replace('_',' '), true); }
+  else showToast(r.error || 'Unauthorized — check admin key in Settings', false);
+}
+
+async function showDetail(id) {
+  const r = await get('/api/alerts/' + id);
+  if (r.error) { showToast(r.error, false); return; }
+  document.getElementById('detailContent').innerHTML = `
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:6px">${sevBadge(r.severity)} <span style="font-size:11px;color:#8b949e;font-weight:400">${r.confidence} confidence</span></h3>
+    <p class="mono" style="font-size:11px;color:#484f58;margin-bottom:8px">${r.event_id}</p>
+    ${r.action ? '<p style="font-size:12px;font-weight:600;color:#f78166;margin-bottom:8px">Action: ' + r.action + '</p>' : ''}
+    <p style="font-size:11px;color:#6e7681;margin-bottom:8px">Apps: ${(r.matched_apps||'').replace(/[\[\]"]/g,'') || 'none'} · ${stBadge(r.status)} · ${r.created_at}</p>
+    <div class="exp-block">${r.explanation || 'No explanation available.'}</div>`;
+  document.getElementById('detail-modal').classList.add('active');
+}
+
+// ─── Tech Stack ───
+async function loadTechStack() {
+  const data = await get('/api/techstack');
+  if (!data || !data.apps) return;
+  document.getElementById('techstackList').innerHTML = data.apps.map(a => `
+    <div class="table-row" style="grid-template-columns:1fr 100px 100px 100px 100px 40px;cursor:default">
+      <div style="font-weight:600">${a.name}</div>
+      <div class="editable" contenteditable="true" data-field="version" data-name="${a.name}" onblur="saveAppEdit(this)">${a.version || '—'}</div>
+      <div><select style="font-size:11px;background:transparent;border:none;color:#c9d1d9;cursor:pointer;padding:0" data-field="criticality" data-name="${a.name}" onchange="saveSelectEdit(this)">
+        <option value="critical" ${a.criticality==='critical'?'selected':''}>Critical</option>
+        <option value="high" ${a.criticality==='high'?'selected':''}>High</option>
+        <option value="medium" ${a.criticality==='medium'?'selected':''}>Medium</option>
+        <option value="low" ${a.criticality==='low'?'selected':''}>Low</option>
+      </select></div>
+      <div><select style="font-size:11px;background:transparent;border:none;color:#c9d1d9;cursor:pointer;padding:0" data-field="internet_facing" data-name="${a.name}" onchange="saveSelectEdit(this)">
+        <option value="true" ${a.internet_facing?'selected':''}>Internet</option>
+        <option value="false" ${a.internet_facing?'':'selected'}>Internal</option>
+      </select></div>
+      <div style="font-size:11px;color:#6e7681">${a.category || '—'}</div>
+      <div style="text-align:right"><button class="btn btn-danger" onclick="removeApp('${a.name}')" style="padding:2px 8px;font-size:13px">×</button></div>
+    </div>`).join('');
+}
+async function saveAppEdit(el) {
+  const data = await get('/api/techstack');
+  const app = data.apps.find(a => a.name === el.dataset.name);
+  if (!app) return;
+  if (el.dataset.field === 'version') app.version = el.textContent.trim() === '—' ? '' : el.textContent.trim();
+  const r = await adm('PUT', '/admin/techstack', app);
+  showToast(r.status === 'ok' ? 'Updated ' + el.dataset.name : (r.error || 'Error'), r.status === 'ok');
+}
+async function saveSelectEdit(el) {
+  const data = await get('/api/techstack');
+  const app = data.apps.find(a => a.name === el.dataset.name);
+  if (!app) return;
+  if (el.dataset.field === 'criticality') app.criticality = el.value;
+  if (el.dataset.field === 'internet_facing') app.internet_facing = el.value === 'true';
+  const r = await adm('PUT', '/admin/techstack', app);
+  showToast(r.status === 'ok' ? 'Updated ' + el.dataset.name : (r.error || 'Error'), r.status === 'ok');
+}
+async function addApp() {
+  const nm = document.getElementById('addName').value.trim();
+  if (!nm) return showToast('Name required', false);
+  const app = { name: nm, version: document.getElementById('addVersion').value, vendor: document.getElementById('addVendor').value,
+    category: document.getElementById('addCategory').value, criticality: document.getElementById('addCriticality').value,
+    owner_team: document.getElementById('addOwner').value, internet_facing: document.getElementById('addInternet').value === 'true',
+    hosts: document.getElementById('addHosts').value, data_sensitivity: document.getElementById('addDataSens').value };
+  const r = await adm('POST', '/admin/techstack', app);
+  if (r.status === 'ok') { showToast('Added ' + nm, true); document.getElementById('addAppForm').style.display = 'none'; loadTechStack(); refreshAll(); }
+  else showToast(r.error || 'Error', false);
+}
+async function removeApp(name) {
+  if (!await showConfirm('Remove <b>' + name + '</b> from tech stack?')) return;
+  const r = await adm('DELETE', '/admin/techstack', { name });
+  if (r.status === 'ok') { showToast('Removed ' + name, true); loadTechStack(); refreshAll(); }
+  else showToast(r.error || 'Error', false);
+}
+
+// ─── Import ───
+function handleCSV(input) {
+  const f = input.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = async function() {
+    const r = await fetch(API + '/admin/import', { method: 'POST', headers: { 'Content-Type': 'text/csv', 'X-Arbiter-Key': AK() }, body: reader.result });
+    const d = await r.json();
+    const div = document.getElementById('importResult');
+    div.style.display = 'block';
+    div.style.padding = '10px'; div.style.borderRadius = '6px'; div.style.marginTop = '8px';
+    if (d.status === 'ok') { div.style.background = 'rgba(63,185,80,0.08)'; div.style.color = '#3fb950'; div.style.border = '1px solid rgba(63,185,80,0.2)'; }
+    else { div.style.background = 'rgba(248,81,73,0.08)'; div.style.color = '#f85149'; div.style.border = '1px solid rgba(248,81,73,0.2)'; }
+    div.textContent = `Imported ${d.imported} apps · ${d.added} added · ${d.removed} removed`;
+    if (d.status === 'ok') { setTimeout(refreshAll, 400); loadTechStack(); }
+  };
+  reader.readAsText(f);
+}
+
+// ─── Settings ───
+function saveSettings() {
+  const k = document.getElementById('settingsKey').value;
+  if (k) localStorage.setItem('arbiter_admin_key', k);
+  localStorage.setItem('arbiter_slack', document.getElementById('settingsSlack').value);
+  localStorage.setItem('arbiter_teams', document.getElementById('settingsTeams').value);
+  localStorage.setItem('arbiter_email', document.getElementById('settingsEmail').value);
+}
+function loadSettings() {
+  document.getElementById('settingsKey').value = localStorage.getItem('arbiter_admin_key') || '';
+  document.getElementById('settingsSlack').value = localStorage.getItem('arbiter_slack') || '';
+  document.getElementById('settingsTeams').value = localStorage.getItem('arbiter_teams') || '';
+  document.getElementById('settingsEmail').value = localStorage.getItem('arbiter_email') || '';
+}
+async function testSettings() {
+  const div = document.getElementById('settingsResult'); div.textContent = 'Testing…';
+  const r = await adm('POST', '/admin/pull', {});
+  div.textContent = r.status === 'ok' ? '✓ Key valid' : '✗ ' + (r.error || 'Failed');
+}
+
+// ─── Auth ───
+var currentUser = null;
+async function checkSession() {
+  try {
+    const r = await fetch('/auth/session');
+    if (r.ok) { currentUser = await r.json(); document.getElementById('headerUser').textContent = currentUser.username; applyRole(); }
+    else window.location.href = '/login';
+  } catch(e) { window.location.href = '/login'; }
+}
+function applyRole() {
+  if (!currentUser) return;
+  const admin = currentUser.role === 'admin';
+  document.querySelectorAll('.admin-only').forEach(e => e.style.display = admin ? '' : 'none');
+  document.querySelectorAll('.reader-only').forEach(e => e.style.display = admin ? 'none' : '');
+}
+async function logout() { await fetch('/auth/logout', { method: 'POST' }); window.location.href = '/login'; }
+
+// ─── Users ───
+async function loadUsers() {
+  const r = await fetch('/admin/users'); const d = await r.json();
+  if (!d.users) return;
+  document.getElementById('userList').innerHTML = d.users.map(u => `
+    <div class="table-row" style="grid-template-columns:1fr 80px 120px;cursor:default">
+      <div style="font-weight:600">${u.username}</div>
+      <div><span class="badge badge-info">${u.role}</span></div>
+      <div style="display:flex;gap:4px">
+        <button class="btn" onclick="editUser('${u.username}','${u.role}')">Edit</button>
+        <button class="btn btn-danger" onclick="deleteUser('${u.username}')">Remove</button>
       </div>
-      <div id="settingsResult" class="text-xs mt-3"></div>
-    </div>
-  </div>
+    </div>`).join('');
+}
+var editingUser = null;
+function showAddUser() {
+  editingUser = null;
+  document.getElementById('userFormTitle').textContent = 'Add User';
+  document.getElementById('userUsername').value = ''; document.getElementById('userUsername').disabled = false;
+  document.getElementById('userPassword').value = ''; document.getElementById('userRole').value = 'reader';
+  document.getElementById('userForm').style.display = 'block';
+}
+function editUser(u, r) {
+  editingUser = u;
+  document.getElementById('userFormTitle').textContent = 'Edit ' + u;
+  document.getElementById('userUsername').value = u; document.getElementById('userUsername').disabled = true;
+  document.getElementById('userPassword').value = ''; document.getElementById('userRole').value = r;
+  document.getElementById('userForm').style.display = 'block';
+}
+async function saveUser() {
+  const u = document.getElementById('userUsername').value.trim(), p = document.getElementById('userPassword').value, rl = document.getElementById('userRole').value;
+  if (!u) return;
+  const method = editingUser ? 'PUT' : 'POST';
+  const body = editingUser ? { username: editingUser, password: p, role: rl } : { username: u, password: p, role: rl };
+  const r = await fetch('/admin/users', { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const d = await r.json();
+  if (r.ok) { showToast(editingUser ? 'Updated ' + editingUser : 'Created ' + u, true); document.getElementById('userForm').style.display = 'none'; loadUsers(); }
+  else showToast(d.error || 'Error', false);
+}
+async function deleteUser(u) {
+  if (!await showConfirm('Remove user <b>' + u + '</b>?')) return;
+  const r = await fetch('/admin/users', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username: u}) });
+  if (r.ok) { showToast('Removed ' + u, true); loadUsers(); }
+  else { const d = await r.json(); showToast(d.error || 'Error', false); }
+}
 
-  <!-- Alert Detail Modal -->
-  <div class="modal-overlay" id="detail-modal">
-    <div class="modal-box" style="max-width:700px">
-      <div id="detailContent"></div>
-      <button class="btn-ghost mt-4" onclick="document.getElementById('detail-modal').classList.remove('active')">Close</button>
-    </div>
-  </div>
+// ─── Tabs ───
+document.getElementById('tabs').addEventListener('click', function(e) {
+  const tab = e.target.closest('.tab'); if (!tab) return;
+  document.querySelectorAll('#tabs .tab').forEach(t => t.classList.toggle('active', t === tab));
+  ['alerts','import','techstack','users'].forEach(t => document.getElementById('panel-'+t).style.display = t===tab.dataset.tab ? '' : 'none');
+  if (tab.dataset.tab === 'techstack') loadTechStack();
+  if (tab.dataset.tab === 'users') loadUsers();
+});
 
-  <script>
-    const API = '';
-    const ADMIN_KEY = () => localStorage.getItem('arbiter_admin_key') || '';
+// ─── Drag & drop ───
+const dz = document.getElementById('dropZone');
+if (dz) {
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = '#58a6ff'; });
+  dz.addEventListener('dragleave', () => { dz.style.borderColor = '#1c2128'; });
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.style.borderColor = '#1c2128';
+    if (e.dataTransfer.files.length) { document.getElementById('csvFile').files = e.dataTransfer.files; handleCSV(document.getElementById('csvFile')); }
+  });
+}
 
-    // ─── API helpers ───
-    async function get(path) {
-      const r = await fetch(API + path);
-      return r.json();
-    }
-    async function adminPost(path, body) {
-      const r = await fetch(API + path, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Arbiter-Key': ADMIN_KEY() }, body: JSON.stringify(body)
-      });
-      return r.json();
-    }
-    async function adminPut(path, body) {
-      const r = await fetch(API + path, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Arbiter-Key': ADMIN_KEY() }, body: JSON.stringify(body)
-      });
-      return r.json();
-    }
-    async function adminDel(path, body) {
-      const r = await fetch(API + path, {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json', 'X-Arbiter-Key': ADMIN_KEY() }, body: JSON.stringify(body)
-      });
-      return r.json();
-    }
+// ─── Modals ───
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', function(e) { if (e.target === m) m.classList.remove('active'); }));
 
-    function sevBadge(s) {
-      const m = { critical: 'badge-crit', high: 'badge-high', medium: 'badge-med', low: 'badge-low' };
-      return `<span class="${m[s] || 'badge-low'} text-xs px-2 py-0.5 rounded-full font-medium">${(s||'').toUpperCase()}</span>`;
-    }
-    function statusColor(s) {
-      const m = { new: 'text-rose-400', acked: 'text-amber-400', false_pos: 'text-purple-400', resolved: 'text-emerald-400' };
-      return m[s] || 'text-slate-400';
-    }
+function showConfirm(msg) {
+  return new Promise(resolve => {
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:200;display:flex;align-items:center;gap:12px;padding:10px 18px;background:#12171e;border:1px solid #f85149;border-radius:6px;color:#c9d1d9;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,0.5)';
+    bar.innerHTML = '<span>' + msg + '</span><button style="background:#da3633;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer">Delete</button><button style="background:#30363d;color:#c9d1d9;border:none;border-radius:4px;padding:5px 12px;font-size:11px;cursor:pointer">Cancel</button>';
+    document.body.appendChild(bar);
+    var btns = bar.querySelectorAll('button');
+    btns[0].onclick = function() { bar.remove(); resolve(true); };
+    btns[1].onclick = function() { bar.remove(); resolve(false); };
+    setTimeout(function() { bar.remove(); resolve(false); }, 15000);
+  });
+}
 
-    // ─── Refresh all ───
-    var allAlerts = [];
+function showToast(msg, ok) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.style.background = ok ? '#12171e' : '#12171e';
+  t.style.border = ok ? '1px solid rgba(63,185,80,0.3)' : '1px solid rgba(248,81,73,0.3)';
+  t.style.color = ok ? '#3fb950' : '#f85149';
+  t.textContent = msg; document.body.appendChild(t); setTimeout(function() { t.remove(); }, 3000);
+}
 
-    async function refreshAll() {
-      const [stats, alerts, health] = await Promise.all([
-        get('/api/stats'), get('/api/alerts'), get('/health')
-      ]);
-
-      // Stats
-      if (stats && stats.alerts) {
-        document.getElementById('statCritical').textContent = stats.alerts.critical || 0;
-        document.getElementById('statHigh').textContent = stats.alerts.high || 0;
-        document.getElementById('statMedium').textContent = stats.alerts.medium || 0;
-        document.getElementById('statLow').textContent = stats.alerts.low || 0;
-        document.getElementById('statApps').textContent = stats.apps_tracked || 0;
-      }
-
-      // Health bar
-      if (health) {
-        const cursor = health.last_misp_pull;
-        const date = cursor ? new Date(parseInt(cursor) * 1000) : null;
-        document.getElementById('hMispText').textContent = date ? 'pulled ' + date.toLocaleString() : 'no pull yet';
-        document.getElementById('hMisp').className = 'health-dot ' + (date ? 'ok' : 'warn');
-        document.getElementById('hKevText').textContent = (health.kev_entries || 0) + ' entries';
-        document.getElementById('hKev').className = 'health-dot ' + ((health.kev_entries || 0) > 0 ? 'ok' : 'warn');
-        document.getElementById('hNewCount').textContent = health.alerts_new || 0;
-        document.getElementById('hNew').className = 'health-dot ' + ((health.alerts_new || 0) > 0 ? 'warn' : 'ok');
-        if (date) document.getElementById('hCursor').textContent = 'Last MISP: ' + date.toLocaleString();
-      }
-
-      // Alerts
-      allAlerts = (alerts && alerts.alerts) ? alerts.alerts : [];
-      document.getElementById('lastUpdate').textContent = 'Updated just now';
-      renderAlerts();
-    }
-
-    function renderAlerts() {
-      const list = document.getElementById('alertList');
-      const q = (document.getElementById('alertSearch').value || '').toLowerCase();
-      const status = document.getElementById('filterStatus').value;
-      const sev = document.getElementById('filterSev').value;
-      const app = (document.getElementById('filterApp').value || '').toLowerCase();
-
-      let filtered = allAlerts;
-      if (q) filtered = filtered.filter(a => (a.event_id||'').toLowerCase().includes(q) || (a.explanation||'').toLowerCase().includes(q));
-      if (status) filtered = filtered.filter(a => a.status === status);
-      if (sev) filtered = filtered.filter(a => a.severity === sev);
-      if (app) filtered = filtered.filter(a => (a.matched_apps||'').toLowerCase().includes(app));
-
-      document.getElementById('alertCount').textContent = `Showing ${filtered.length}/${allAlerts.length}`;
-
-      if (filtered.length === 0) {
-        list.innerHTML = '<div class="px-4 py-8 text-center text-slate-500">No alerts match your filters.</div>';
-        return;
-      }
-
-      list.innerHTML = filtered.map((a, i) => {
-        let eventDisplay = (a.event_id || '').length > 36 ? a.event_id.substring(0, 36) + '…' : (a.event_id || '');
-        let actionBar = '';
-        if (a.status === 'new' || a.status === 'acked') {
-          actionBar = `
-            <button class="btn-ghost text-xs" onclick="event.stopPropagation(); updateAlert('${a.id}','acked')">✓ Ack</button>
-            <button class="btn-danger text-xs" onclick="event.stopPropagation(); updateAlert('${a.id}','false_pos')">✗ False Pos</button>
-            <button class="btn-ghost text-xs" onclick="event.stopPropagation(); updateAlert('${a.id}','resolved')">✔ Resolve</button>
-          `;
-        }
-        return `
-          <div class="grid grid-cols-12 gap-2 px-4 py-2.5 text-sm row-hover border-b border-slate-800 items-center" style="cursor:pointer" onclick="showDetail('${a.id}')">
-            <div class="col-span-1">${sevBadge(a.severity)}</div>
-            <div class="col-span-1 text-xs">${a.confidence}</div>
-            <div class="col-span-2 text-xs truncate" title="${a.event_id}">${eventDisplay}</div>
-            <div class="col-span-2 text-xs text-slate-400 truncate">${(a.matched_apps||'[]').replace(/[\[\]"]/g,'').substring(0,40)}</div>
-            <div class="col-span-1 text-xs ${statusColor(a.status)}">${a.status}</div>
-            <div class="col-span-1 text-xs text-slate-500">${(a.created_at||'').substring(11,16)}</div>
-            <div class="col-span-4 flex gap-1">${actionBar}
-              <button class="btn-ghost text-xs" onclick="event.stopPropagation(); showDetail('${a.id}')">📋 Detail</button>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function filterAlerts() { renderAlerts(); }
-
-    async function updateAlert(id, status) {
-      const r = await adminPost('/admin/ack/' + id, { status });
-      if (r.status === 'ok') {
-        showToast(`Alert ${status.replace('_',' ')}`, true);
-        setTimeout(refreshAll, 400);
-      } else {
-        showToast('Error: ' + (r.error || 'unauthorized — check admin key in Settings'), false);
-      }
-    }
-
-    async function showDetail(id) {
-      const r = await get('/api/alerts/' + id);
-      if (r.error) { showToast(r.error, false); return; }
-
-      let apps = '[]';
-      try { apps = JSON.parse(r.matched_apps || '[]'); } catch(e) {}
-
-      const html = `
-        <h3 class="text-base font-semibold mb-1">${sevBadge(r.severity)} <span class="text-xs text-slate-400 ml-2">${r.confidence} confidence</span></h3>
-        <p class="text-xs text-slate-400 mb-3">${r.event_id}</p>
-        ${r.action ? `<p class="text-sm font-medium text-cyan-400 mb-3">⚠ Action: ${r.action}</p>` : ''}
-        <p class="text-xs text-slate-500 mb-1">Matched apps: ${(r.matched_apps||'').replace(/[\[\]"]/g,'') || 'none'}</p>
-        <p class="text-xs text-slate-500 mb-1">Status: <span class="${statusColor(r.status)}">${r.status}</span> · ${r.created_at}</p>
-        <div class="exp-block text-slate-300">${r.explanation || 'No explanation available.'}</div>
-        ${r.routed_to && r.routed_to !== 'null' && r.routed_to !== '[]' ? `<p class="text-xs text-slate-500 mt-2">Routed to: ${r.routed_to}</p>` : ''}
-      `;
-      document.getElementById('detailContent').innerHTML = html;
-      document.getElementById('detail-modal').classList.add('active');
-    }
-
-    // ─── Tech Stack ───
-    async function loadTechStack() {
-      const data = await get('/api/techstack');
-      if (!data || !data.apps) return;
-      document.getElementById('techstackList').innerHTML = data.apps.map(a => `
-        <div class="grid grid-cols-6 gap-2 px-4 py-2 text-sm row-hover border-b border-slate-800 items-center">
-          <div class="font-medium">${a.name}</div>
-          <div class="editable text-slate-400 text-xs" contenteditable="true" data-field="version" data-name="${a.name}" onblur="saveAppEdit(this)">${a.version || '—'}</div>
-          <div>
-            <select class="text-xs bg-transparent border-none text-slate-300" data-field="criticality" data-name="${a.name}" onchange="saveSelectEdit(this)">
-              <option value="critical" ${a.criticality==='critical'?'selected':''}>Critical</option>
-              <option value="high" ${a.criticality==='high'?'selected':''}>High</option>
-              <option value="medium" ${a.criticality==='medium'?'selected':''}>Medium</option>
-              <option value="low" ${a.criticality==='low'?'selected':''}>Low</option>
-            </select>
-          </div>
-          <div>
-            <select class="text-xs bg-transparent border-none text-slate-300" data-field="internet_facing" data-name="${a.name}" onchange="saveSelectEdit(this)">
-              <option value="true" ${a.internet_facing?'selected':''}>🌐 yes</option>
-              <option value="false" ${a.internet_facing?'':'selected'}>🔒 no</option>
-            </select>
-          </div>
-          <div class="text-slate-400 text-xs">${a.category || '—'}</div>
-          <div class="flex gap-1 justify-end">
-            <button class="btn-danger text-xs" onclick="removeApp('${a.name}')">✕</button>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    async function saveAppEdit(el) {
-      const name = el.dataset.name;
-      const field = el.dataset.field;
-      const value = field === 'version' ? (el.textContent.trim() === '—' ? '' : el.textContent.trim()) : null;
-      // Rebuild full app from existing row data, just patch the changed field
-      const data = await get('/api/techstack');
-      const app = data.apps.find(a => a.name === name);
-      if (!app) return;
-      if (field === 'version') app.version = value;
-
-      const r = await adminPut('/admin/techstack', app);
-      if (r.status === 'ok') showToast(`Updated ${name}`, true);
-      else showToast('Error: ' + (r.error || 'unauthorized'), false);
-    }
-
-    async function saveSelectEdit(el) {
-      const name = el.dataset.name;
-      const field = el.dataset.field;
-      const value = el.value;
-      const data = await get('/api/techstack');
-      const app = data.apps.find(a => a.name === name);
-      if (!app) return;
-      if (field === 'criticality') app.criticality = value;
-      if (field === 'internet_facing') app.internet_facing = value === 'true';
-
-      const r = await adminPut('/admin/techstack', app);
-      if (r.status === 'ok') showToast(`Updated ${name}`, true);
-      else showToast('Error: ' + (r.error || 'unauthorized'), false);
-    }
-
-    async function addApp() {
-      const name = document.getElementById('addName').value.trim();
-      if (!name) return showToast('Name is required', false);
-      const app = {
-        name,
-        version: document.getElementById('addVersion').value,
-        vendor: document.getElementById('addVendor').value,
-        category: document.getElementById('addCategory').value,
-        criticality: document.getElementById('addCriticality').value,
-        owner_team: document.getElementById('addOwner').value,
-        internet_facing: document.getElementById('addInternet').value === 'true',
-        hosts: document.getElementById('addHosts').value,
-        data_sensitivity: document.getElementById('addDataSens').value,
-      };
-      const r = await adminPost('/admin/techstack', app);
-      if (r.status === 'ok') {
-        showToast('Added ' + name, true);
-        document.getElementById('addAppForm').style.display = 'none';
-        loadTechStack();
-        refreshAll();
-      } else {
-        showToast('Error: ' + (r.error || 'unauthorized'), false);
-      }
-    }
-
-    async function removeApp(name) {
-      if (!confirm('Remove ' + name + ' from tech stack?')) return;
-      const r = await adminDel('/admin/techstack', { name });
-      if (r.status === 'ok') {
-        showToast('Removed ' + name, true);
-        loadTechStack();
-        refreshAll();
-      } else {
-        showToast('Error: ' + (r.error || 'unauthorized'), false);
-      }
-    }
-
-    // ─── Import CSV ───
-    function handleCSV(input) {
-      const file = input.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async function() {
-        const r = await fetch(API + '/admin/import', {
-          method: 'POST', headers: { 'Content-Type': 'text/csv', 'X-Arbiter-Key': ADMIN_KEY() }, body: reader.result
-        });
-        const data = await r.json();
-        const div = document.getElementById('importResult');
-        div.className = 'text-sm mt-3 p-3 rounded-lg ' + (data.status === 'ok' ? 'bg-emerald-900/30 text-emerald-300' : 'bg-rose-900/30 text-rose-300');
-        div.classList.remove('hidden');
-        div.textContent = `Imported ${data.imported} apps · ${data.added} added · ${data.removed} removed`;
-        if (data.status === 'ok') { setTimeout(refreshAll, 500); loadTechStack(); }
-      };
-      reader.readAsText(file);
-    }
-
-    // ─── Settings ───
-    function saveSettings() {
-      const key = document.getElementById('settingsKey').value;
-      if (key) localStorage.setItem('arbiter_admin_key', key);
-      localStorage.setItem('arbiter_slack', document.getElementById('settingsSlack').value);
-      localStorage.setItem('arbiter_teams', document.getElementById('settingsTeams').value);
-      localStorage.setItem('arbiter_email', document.getElementById('settingsEmail').value);
-    }
-    function loadSettings() {
-      document.getElementById('settingsKey').value = localStorage.getItem('arbiter_admin_key') || '';
-      document.getElementById('settingsSlack').value = localStorage.getItem('arbiter_slack') || '';
-      document.getElementById('settingsTeams').value = localStorage.getItem('arbiter_teams') || '';
-      document.getElementById('settingsEmail').value = localStorage.getItem('arbiter_email') || '';
-    }
-    async function testSettings() {
-      const div = document.getElementById('settingsResult');
-      div.textContent = 'Testing...';
-      const r = await adminPost('/admin/pull', {});
-      div.textContent = r.status === 'ok' ? '✅ Admin key valid. Pull triggered.' : '❌ ' + (r.error || 'Failed');
-    }
-
-    // ─── Drag and drop ───
-    const dropZone = document.getElementById('dropZone');
-    if (dropZone) {
-      dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('border-cyan-400'); });
-      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-cyan-400'));
-      dropZone.addEventListener('drop', e => {
-        e.preventDefault(); dropZone.classList.remove('border-cyan-400');
-        if (e.dataTransfer.files.length) {
-          document.getElementById('csvFile').files = e.dataTransfer.files;
-          handleCSV(document.getElementById('csvFile'));
-        }
-      });
-    }
-
-    // ─── Modal close on backdrop click ───
-    document.querySelectorAll('.modal-overlay').forEach(m => {
-      m.addEventListener('click', function(e) { if (e.target === m) m.classList.remove('active'); });
-    });
-
-    function showToast(msg, ok) {
-      const t = document.createElement('div');
-      t.className = 'toast ' + (ok ? 'bg-emerald-800 text-emerald-200' : 'bg-rose-800 text-rose-200');
-      t.textContent = msg;
-      document.body.appendChild(t);
-      setTimeout(() => t.remove(), 3000);
-    }
-
-    // ─── Auth ───
-    var currentUser = null;
-    async function checkSession() {
-      try {
-        const r = await fetch('/auth/session');
-        if (r.ok) {
-          currentUser = await r.json();
-          document.getElementById('headerUser').textContent = '👤 ' + currentUser.username + ' (' + currentUser.role + ')';
-          applyRole();
-        } else {
-          window.location.href = '/login';
-        }
-      } catch(e) { window.location.href = '/login'; }
-    }
-    function applyRole() {
-      if (!currentUser) return;
-      const isAdmin = currentUser.role === 'admin';
-      document.querySelectorAll('.admin-only').forEach(el => {
-        el.style.display = isAdmin ? '' : 'none';
-      });
-      document.querySelectorAll('.reader-only').forEach(el => {
-        el.style.display = isAdmin ? 'none' : '';
-      });
-    }
-    async function logout() {
-      await fetch('/auth/logout', { method: 'POST' });
-      window.location.href = '/login';
-    }
-
-    // ─── User Management (admin only) ───
-    async function loadUsers() {
-      const r = await fetch('/admin/users');
-      const data = await r.json();
-      if (!data.users) return;
-      document.getElementById('userList').innerHTML = data.users.map(u => `
-        <div class="grid grid-cols-4 gap-2 px-4 py-2 text-sm row-hover border-b border-slate-800 items-center">
-          <div>${u.username}</div>
-          <div><span class="badge-info text-xs px-2 py-0.5 rounded-full">${u.role}</span></div>
-          <div class="flex gap-1">
-            <button class="btn-ghost text-xs" onclick="editUser('${u.username}','${u.role}')">Edit</button>
-            <button class="btn-danger text-xs" onclick="deleteUser('${u.username}')">✕</button>
-          </div>
-          <div></div>
-        </div>
-      `).join('');
-    }
-    var editingUser = null;
-    function showAddUser() {
-      editingUser = null;
-      document.getElementById('userFormTitle').textContent = 'Add User';
-      document.getElementById('userUsername').value = '';
-      document.getElementById('userUsername').disabled = false;
-      document.getElementById('userPassword').value = '';
-      document.getElementById('userRole').value = 'reader';
-      document.getElementById('userForm').style.display = 'block';
-    }
-    function editUser(username, role) {
-      editingUser = username;
-      document.getElementById('userFormTitle').textContent = 'Edit ' + username;
-      document.getElementById('userUsername').value = username;
-      document.getElementById('userUsername').disabled = true;
-      document.getElementById('userPassword').value = '';
-      document.getElementById('userRole').value = role;
-      document.getElementById('userForm').style.display = 'block';
-    }
-    async function saveUser() {
-      const username = document.getElementById('userUsername').value.trim();
-      const password = document.getElementById('userPassword').value;
-      const role = document.getElementById('userRole').value;
-      if (!username) return;
-      const method = editingUser ? 'PUT' : 'POST';
-      const body = editingUser ? { username: editingUser, password, role } : { username, password, role };
-      const r = await fetch('/admin/users', { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-      const d = await r.json();
-      if (r.ok) {
-        showToast(editingUser ? 'Updated ' + editingUser : 'Created ' + username, true);
-        document.getElementById('userForm').style.display = 'none';
-        loadUsers();
-      } else {
-        showToast('Error: ' + (d.error || 'failed'), false);
-      }
-    }
-    async function deleteUser(username) {
-      if (!confirm('Delete user ' + username + '?')) return;
-      const r = await fetch('/admin/users', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username}) });
-      if (r.ok) { showToast('Deleted ' + username, true); loadUsers(); }
-      else { const d = await r.json(); showToast('Error: ' + (d.error || 'failed'), false); }
-    }
-
-    // ─── Tabs (updated to include Users) ───
-    document.getElementById('tabs').addEventListener('click', function(e) {
-      const tab = e.target.closest('.tab');
-      if (!tab) return;
-      const name = tab.dataset.tab;
-      document.querySelectorAll('#tabs .tab').forEach(t => {
-        t.className = t.dataset.tab === name ? 'px-4 py-2 text-sm font-medium border-b-2 border-cyan-400 text-cyan-400 tab' : 'px-4 py-2 text-sm font-medium text-slate-500 tab';
-      });
-      ['alerts','import','techstack','users'].forEach(t => {
-        document.getElementById('panel-' + t).style.display = t === name ? '' : 'none';
-      });
-      if (name === 'techstack') loadTechStack();
-      if (name === 'users') loadUsers();
-    });
-
-    // ─── Startup ───
-    checkSession().then(() => {
-      loadSettings();
-      refreshAll();
-      setInterval(refreshAll, 30000);
-    });
-  </script>
+checkSession().then(function() { loadSettings(); refreshAll(); setInterval(refreshAll, 30000); });
+</script>
 </body>
 </html>
