@@ -88,6 +88,11 @@ Multi-user with role-based access control:
 
 ## Architecture
 
+![Architecture Overview](docs/architecture-overview.png)
+
+> [Interactive SVG detail diagram →](docs/architecture.html)
+> [Complete design document →](docs/design.md)
+
 ### Pull-All, Filter-Local
 
 The arbiter does **not** query MISP by galaxy, tag, or CVE. It calls:

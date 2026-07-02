@@ -27,11 +27,17 @@
         <div class="pulse-dot"></div>
         <h1>Threat Intel Arbiter — Threat Prioritization Engine</h1>
       </div>
-      <p class="subtitle">Single binary · Deploy in 60 seconds · MISP + KEV sources (v1) · Severity + Confidence + Explanation on every alert · Calibration feedback loop</p>
+      <p class="subtitle">No galaxy/tag/CVE pre-filter at API level. Arbiter fetches ALL events from MISP — matchers decide relevance locally against org tech stack + sector + KEV. MISP is a threat intel aggregation channel, not a filtering gate.</p>
     </div>
 
-    <div class="diagram-container">
-      <svg viewBox="0 0 1125 1060" xmlns="http://www.w3.org/2000/svg">
+    <!-- Architecture Overview Image -->
+    <div style="text-align:center;margin-bottom:1.5rem;padding:1rem;background:rgba(15,23,42,0.4);border-radius:1rem;border:1px solid #1e293b;">
+      <img src="architecture-overview.png" alt="Threat Intel Arbiter Architecture Overview" style="max-width:100%;height:auto;border-radius:8px;">
+      <p style="color:#64748b;font-size:0.65rem;margin-top:0.5rem;">Threat Intel Arbiter — System Architecture Overview</p>
+    </div>
+
+    <div class=\"diagram-container\">
+      <svg viewBox=\"0 0 1125 1060\" xmlns=\"http://www.w3.org/2000/svg\">
         <defs>
           <marker id="a-sl" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/></marker>
           <marker id="a-em" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/></marker>
