@@ -90,7 +90,7 @@ Multi-user with role-based access control:
 
 ![Architecture Overview](docs/architecture-overview.png)
 
-> [Interactive SVG detail diagram →](docs/architecture.html)
+> [Architecture diagram →](docs/architecture.svg)
 > [Complete design document →](docs/design.md)
 
 ### Pull-All, Filter-Local

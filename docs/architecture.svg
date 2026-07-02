@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1125 1060" width="1125" height="1060">
+  <rect width="100%" height="100%" fill="#020617"/>
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+  </pattern>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+  
+        <defs>
+          <marker id="a-sl" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/></marker>
+          <marker id="a-em" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/></marker>
+          <marker id="a-am" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/></marker>
+          <marker id="a-vi" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/></marker>
+          <marker id="a-cy" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/></marker>
+          <marker id="a-or" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#fb923c"/></marker>
+          <marker id="a-bl" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/></marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern>
+        </defs>
+
+        <rect width="100%" height="100%" fill="url(#grid)"/>
+
+        <!-- Banner -->
+        <rect x="14" y="6" width="1096" height="48" rx="6" fill="rgba(6,78,59,0.08)" stroke="#34d399" stroke-width="0.8"/>
+        <text x="30" y="26" fill="#34d399" font-size="9" font-weight="600">Threat Intel Arbiter — threat prioritization engine. One binary, 60-second deploy. Pull-all, filter-local architecture. MISP + KEV sources. Severity + Confidence + Explanation.</text>
+        <text x="30" y="44" fill="#475569" font-size="7.5">No galaxy/tag/CVE pre-filter at API level. Arbiter fetches ALL events from MISP — matchers decide relevance locally against org tech stack + sector + KEV. MISP is a threat intel aggregation channel, not a filtering gate.</text>
+
+        <!-- ============================================================
+             LEFT: INPUTS
+             ============================================================ -->
+
+        <!-- Org Profile -->
+        <rect x="14" y="72" width="155" height="55" rx="6" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="91" y="94" fill="white" font-size="10" font-weight="600" text-anchor="middle">Organisation Profile</text>
+        <text x="91" y="112" fill="#94a3b8" font-size="8" text-anchor="middle">Name · Sector · Country</text>
+        <text x="91" y="124" fill="#3b82f6" font-size="7" text-anchor="middle">NIS sector: Energy</text>
+
+        <!-- CMDB -->
+        <rect x="14" y="148" width="155" height="68" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="91" y="170" fill="white" font-size="10" font-weight="600" text-anchor="middle">CMDB / Asset Tools</text>
+        <text x="91" y="188" fill="#94a3b8" font-size="7.5" text-anchor="middle">ServiceNow · Ivanti · BMC</text>
+        <text x="91" y="202" fill="#94a3b8" font-size="7.5" text-anchor="middle">Snipe-IT · GLPI · NetBox</text>
+        <text x="91" y="214" fill="#fbbf24" font-size="7" text-anchor="middle">Export → techstack.csv</text>
+
+        <!-- Config Files -->
+        <rect x="14" y="240" width="155" height="44" rx="5" fill="rgba(76,29,149,0.08)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="91" y="260" fill="#a78bfa" font-size="9" font-weight="600" text-anchor="middle">Config Files</text>
+        <text x="91" y="278" fill="#94a3b8" font-size="7.5" text-anchor="middle">techstack.csv · routing.yaml · risk.yaml · sources.yaml</text>
+
+        <!-- MISP (primary v1 source) — aggregation channel -->
+        <rect x="14" y="310" width="155" height="100" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="91" y="334" fill="white" font-size="10" font-weight="600" text-anchor="middle">MISP ★ v1 primary</text>
+        <text x="91" y="352" fill="#fbbf24" font-size="7" text-anchor="middle">Aggregation channel</text>
+        <text x="91" y="368" fill="#94a3b8" font-size="7" text-anchor="middle">Peers · ISACs · OSINT · Commer.</text>
+        <text x="91" y="384" fill="#94a3b8" font-size="7.5" text-anchor="middle">REST · HMAC · pull ALL events</text>
+        <text x="91" y="400" fill="#94a3b8" font-size="7" text-anchor="middle">No galaxy/tag/CVE pre-filter</text>
+        <text x="91" y="412" fill="#fbbf24" font-size="6.5" text-anchor="middle">Rich data: all 4 risk dims</text>
+
+        <!-- KEV (v1 secondary) -->
+        <rect x="14" y="430" width="155" height="52" rx="6" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="91" y="452" fill="white" font-size="10" font-weight="600" text-anchor="middle">CISA KEV ★ v1</text>
+        <text x="91" y="470" fill="#94a3b8" font-size="7.5" text-anchor="middle">JSON GET · no auth · daily</text>
+        <text x="91" y="482" fill="#3b82f6" font-size="7" text-anchor="middle">Actively exploited CVEs</text>
+
+        <!-- Future sources (grayed) -->
+        <rect x="14" y="502" width="155" height="38" rx="5" fill="rgba(30,41,59,0.3)" stroke="#475569" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="91" y="520" fill="#475569" font-size="7.5" text-anchor="middle">v2: NVD · GitHub Advisory</text>
+        <text x="91" y="534" fill="#475569" font-size="7" text-anchor="middle">Vendor feeds · RSS · VulnCheck</text>
+
+        <!-- ============================================================
+             THREATLIB CORE
+             ============================================================ -->
+        <rect x="195" y="62" width="555" height="978" rx="12" fill="rgba(6,78,59,0.03)" stroke="#34d399" stroke-width="1.5" stroke-dasharray="8,4"/>
+        <text x="472" y="82" fill="#34d399" font-size="10" font-weight="600" text-anchor="middle">Threat Intel Arbiter — Single Go Binary · One binary per org (v1)</text>
+
+        <!-- AUTH -->
+        <rect x="212" y="102" width="520" height="42" rx="6" fill="rgba(136,19,55,0.2)" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="4,4"/>
+        <text x="472" y="120" fill="#fb7185" font-size="9" font-weight="600" text-anchor="middle">🔒 Auth Gate — X-Arbiter-Key header · Bind localhost · 0600 file perms · Env vars for secrets</text>
+        <text x="472" y="136" fill="#94a3b8" font-size="7.5" text-anchor="middle">REST API (GET) :8080 · Admin API (POST/PUT, auth required) :8080</text>
+
+        <!-- Startup -->
+        <rect x="212" y="156" width="520" height="22" rx="3" fill="rgba(34,197,94,0.05)" stroke="#22c55e" stroke-width="0.6" stroke-dasharray="3,3"/>
+        <text x="472" y="172" fill="#22c55e" font-size="7.5" text-anchor="middle">▶ Startup: load config → fetch warninglists + KEV → open SQLite → migrate → start goroutines</text>
+
+        <!-- ============================================================
+             LAYER 1: INGESTION
+             ============================================================ -->
+        <rect x="212" y="196" width="260" height="78" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="342" y="216" fill="white" font-size="9" font-weight="600" text-anchor="middle">Source Pollers (cron goroutines)</text>
+        <text x="342" y="234" fill="#94a3b8" font-size="7.5" text-anchor="middle">MISP: GET /events/restSearch (15m)</text>
+        <text x="342" y="250" fill="#fbbf24" font-size="7" text-anchor="middle">Unfiltered: no galaxy/tag/CVE param</text>
+        <text x="342" y="266" fill="#94a3b8" font-size="7.5" text-anchor="middle">KEV: GET cisa.gov/kev.json (daily)</text>
+
+        <!-- Normalizers -->
+        <rect x="490" y="196" width="242" height="78" rx="6" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.2"/>
+        <text x="611" y="216" fill="white" font-size="9" font-weight="600" text-anchor="middle">Normalization Layer</text>
+        <text x="611" y="234" fill="#94a3b8" font-size="7.5" text-anchor="middle">Extracts: CVEs · CVSS · tags · actors · refs</text>
+        <text x="611" y="250" fill="#475569" font-size="7" text-anchor="middle">Ignores: raw IOCs (IPs, hashes, domains)</text>
+        <text x="611" y="266" fill="#34d399" font-size="7.5" text-anchor="middle">Canonical ThreatEvent: source-agnostic</text>
+
+        <!-- Warning Filter -->
+        <rect x="490" y="298" width="242" height="48" rx="6" fill="rgba(136,19,55,0.2)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="611" y="318" fill="white" font-size="9" font-weight="600" text-anchor="middle">Warning List Filter</text>
+        <text x="611" y="336" fill="#94a3b8" font-size="7.5" text-anchor="middle">Drop: TLP:RED · disputed CVEs · false positives · noticelists</text>
+
+        <!-- Event Queue -->
+        <rect x="490" y="366" width="242" height="38" rx="6" fill="rgba(251,146,60,0.15)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="611" y="386" fill="white" font-size="9" font-weight="600" text-anchor="middle">Event Queue (buffered chan · FIFO · Drain on SIGTERM)</text>
+
+        <!-- Cold start annotation -->
+        <rect x="212" y="196" width="170" height="16" rx="3" fill="rgba(251,191,36,0.08)" stroke="#fbbf24" stroke-width="0.5" stroke-dasharray="2,2"/>
+        <text x="297" y="208" fill="#fbbf24" font-size="6.5" text-anchor="middle">Cold: 7d · all events → score → suppress < high</text>
+
+        <!-- ============================================================
+             LAYER 2: MATCHING
+             ============================================================ -->
+        <rect x="212" y="435" width="520" height="210" rx="6" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="472" y="458" fill="white" font-size="10" font-weight="600" text-anchor="middle">Matching Engine (pluggable — Matcher interface)</text>
+
+        <!-- Tier 1: CVE -->
+        <rect x="228" y="474" width="240" height="90" rx="5" fill="rgba(6,78,59,0.5)" stroke="#34d399" stroke-width="0.8"/>
+        <text x="348" y="494" fill="#34d399" font-size="8.5" font-weight="600" text-anchor="middle">Tier 1 — CVEMatcher</text>
+        <text x="348" y="512" fill="#94a3b8" font-size="7.5" text-anchor="middle">Extract CVE IDs → normalize vendor</text>
+        <text x="348" y="528" fill="#94a3b8" font-size="7.5" text-anchor="middle">Scheme-detect version → compare</text>
+        <text x="348" y="544" fill="#94a3b8" font-size="7.5" text-anchor="middle">Vers. subsystem: semver/date/sap/win/kernel</text>
+        <text x="348" y="560" fill="#34d399" font-size="7" text-anchor="middle">Match confidence: exact / product_only / unparseable</text>
+
+        <!-- Tier 2: Sector -->
+        <rect x="478" y="474" width="240" height="90" rx="5" fill="rgba(59,130,246,0.12)" stroke="#3b82f6" stroke-width="0.8"/>
+        <text x="598" y="494" fill="#3b82f6" font-size="8.5" font-weight="600" text-anchor="middle">Tier 2 — SectorMatcher</text>
+        <text x="598" y="512" fill="#94a3b8" font-size="7.5" text-anchor="middle">Check event tags: eu-nis-oes · dhs-ciip</text>
+        <text x="598" y="528" fill="#94a3b8" font-size="7.5" text-anchor="middle">nis2 · targeted-threat-index</text>
+        <text x="598" y="544" fill="#94a3b8" font-size="7.5" text-anchor="middle">Cross-ref org sector profile</text>
+        <text x="598" y="560" fill="#3b82f6" font-size="7" text-anchor="middle">Works on events with and without CVEs</text>
+
+        <!-- KEV Matcher -->
+        <rect x="340" y="576" width="230" height="28" rx="4" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="0.6"/>
+        <text x="455" y="594" fill="#3b82f6" font-size="7.5" text-anchor="middle">KEVMatcher: CVE ∈ KEV → actively exploited (+3)</text>
+
+        <!-- Match output -->
+        <rect x="228" y="614" width="490" height="22" rx="4" fill="rgba(34,211,238,0.05)" stroke="#22d3ee" stroke-width="0.6"/>
+        <text x="473" y="630" fill="#22d3ee" font-size="7.5" text-anchor="middle">Match list: [{cve, app, version_affected, match_confidence, sector_match}] → feeds Risk Engine</text>
+
+        <!-- ============================================================
+             LAYER 3: RISK PRIORITIZATION
+             ============================================================ -->
+        <rect x="212" y="670" width="520" height="185" rx="6" fill="rgba(136,19,55,0.25)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="472" y="694" fill="white" font-size="10" font-weight="600" text-anchor="middle">Risk Prioritization Engine</text>
+
+        <!-- Formula -->
+        <rect x="228" y="706" width="165" height="30" rx="4" fill="rgba(34,211,238,0.08)" stroke="#22d3ee" stroke-width="0.6"/>
+        <text x="310" y="726" fill="#22d3ee" font-size="8" font-weight="600" text-anchor="middle">score = (L×I×E) / (maxL×maxI×maxE)</text>
+
+        <!-- Four dimensions -->
+        <rect x="228" y="746" width="120" height="98" rx="4" fill="rgba(15,23,42,0.5)" stroke="#3b82f6" stroke-width="0.5"/>
+        <text x="288" y="765" fill="#3b82f6" font-size="8" font-weight="600" text-anchor="middle">Likelihood</text>
+        <text x="240" y="783" fill="#94a3b8" font-size="7">KEV active expl. +3</text>
+        <text x="240" y="797" fill="#94a3b8" font-size="7">Weaponized +2</text>
+        <text x="240" y="811" fill="#94a3b8" font-size="7">Actor activity +1</text>
+        <text x="240" y="825" fill="#94a3b8" font-size="7">Freshness +1</text>
+        <text x="240" y="839" fill="#475569" font-size="7">Max: 5</text>
+
+        <rect x="360" y="746" width="120" height="98" rx="4" fill="rgba(15,23,42,0.5)" stroke="#fb7185" stroke-width="0.5"/>
+        <text x="420" y="765" fill="#fb7185" font-size="8" font-weight="600" text-anchor="middle">Impact</text>
+        <text x="372" y="783" fill="#94a3b8" font-size="7">CVSS≥9.0 +3</text>
+        <text x="372" y="797" fill="#94a3b8" font-size="7">App critical +2</text>
+        <text x="372" y="811" fill="#94a3b8" font-size="7">Sensitive data +1</text>
+        <text x="372" y="825" fill="#94a3b8" font-size="7">CVSS 7-8.9 +2</text>
+        <text x="372" y="839" fill="#475569" font-size="7">Max: 5</text>
+
+        <rect x="492" y="746" width="120" height="98" rx="4" fill="rgba(15,23,42,0.5)" stroke="#22d3ee" stroke-width="0.5"/>
+        <text x="552" y="765" fill="#22d3ee" font-size="8" font-weight="600" text-anchor="middle">Exposure</text>
+        <text x="504" y="783" fill="#94a3b8" font-size="7">Internet-facing +2</text>
+        <text x="504" y="797" fill="#94a3b8" font-size="7">Untrusted net. +1</text>
+        <text x="504" y="811" fill="#94a3b8" font-size="7">Cred. exposure +1</text>
+        <text x="504" y="839" fill="#475569" font-size="7">Max: 3</text>
+
+        <rect x="624" y="746" width="94" height="50" rx="4" fill="rgba(15,23,42,0.5)" stroke="#a78bfa" stroke-width="0.5"/>
+        <text x="671" y="765" fill="#a78bfa" font-size="7.5" font-weight="600" text-anchor="middle">Confidence</text>
+        <text x="636" y="783" fill="#94a3b8" font-size="6.5">KEV/CERT +3</text>
+        <text x="636" y="795" fill="#94a3b8" font-size="6.5">Max: 4</text>
+
+        <!-- Severity output -->
+        <rect x="228" y="850" width="490" height="22" rx="4" fill="rgba(34,211,238,0.05)" stroke="#22d3ee" stroke-width="0.6"/>
+        <text x="473" y="866" fill="#22d3ee" font-size="7.5" text-anchor="middle">Output: severity label (crit ≥0.50, high ≥0.25, med ≥0.10, low <0.10) + confidence label + explanation</text>
+
+        <!-- Calibration note -->
+        <rect x="624" y="808" width="94" height="36" rx="3" fill="rgba(251,191,36,0.06)" stroke="#fbbf24" stroke-width="0.5" stroke-dasharray="2,2"/>
+        <text x="671" y="822" fill="#fbbf24" font-size="6.5" text-anchor="middle">⚠ Thresholds</text>
+        <text x="671" y="836" fill="#fbbf24" font-size="6.5" text-anchor="middle">uncalibrated</text>
+        <text x="671" y="848" fill="#94a3b8" font-size="6">calibrate via</text>
+        <text x="671" y="858" fill="#94a3b8" font-size="6">feedback loop</text>
+
+        <!-- ============================================================
+             LAYER 4: EXPLAINABILITY + DEDUP + ROUTING
+             ============================================================ -->
+
+        <rect x="212" y="885" width="255" height="52" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="339" y="906" fill="white" font-size="9" font-weight="600" text-anchor="middle">Explainability Engine</text>
+        <text x="339" y="924" fill="#94a3b8" font-size="7.5" text-anchor="middle">Generated from same struct that computed score</text>
+
+        <rect x="480" y="885" width="252" height="52" rx="6" fill="rgba(136,19,55,0.25)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="606" y="906" fill="white" font-size="9" font-weight="600" text-anchor="middle">Dedup + Suppression</text>
+        <text x="606" y="924" fill="#94a3b8" font-size="7.5" text-anchor="middle">Hash(CVE+app+source) · 7d TTL · 2 sources → 1 alert</text>
+
+        <rect x="212" y="958" width="520" height="50" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="472" y="980" fill="white" font-size="10" font-weight="600" text-anchor="middle">Notification Router — by Severity + Confidence</text>
+        <text x="472" y="998" fill="#94a3b8" font-size="7.5" text-anchor="middle">critical+high → #sec-alerts · critical+low → #sec-review · high+low → daily digest · medium → weekly</text>
+
+        <!-- Calibration feedback loop -->
+        <path d="M 255 937 L 255 1030 Q 255 1042 243 1042 L 172 1042 Q 160 1042 160 1030 L 160 768 Q 160 756 172 756 L 212 756" fill="none" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#a-vi)"/>
+        <text x="135" y="900" fill="#a78bfa" font-size="7" text-anchor="middle" transform="rotate(-90,135,900)">false_pos feedback loop (calibration)</text>
+
+        <!-- ============================================================
+             RIGHT: OUTPUTS
+             ============================================================ -->
+        <rect x="778" y="196" width="148" height="48" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="852" y="218" fill="white" font-size="9" font-weight="600" text-anchor="middle">Slack #sec-alerts</text>
+        <text x="852" y="236" fill="#94a3b8" font-size="7.5" text-anchor="middle">Critical+High+High conf.</text>
+
+        <rect x="778" y="268" width="148" height="48" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="852" y="290" fill="white" font-size="9" font-weight="600" text-anchor="middle">Slack #sec-review</text>
+        <text x="852" y="308" fill="#94a3b8" font-size="7.5" text-anchor="middle">Critical+Low+Low conf.</text>
+
+        <rect x="778" y="340" width="148" height="48" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="852" y="362" fill="white" font-size="9" font-weight="600" text-anchor="middle">Slack #it-ops</text>
+        <text x="852" y="380" fill="#94a3b8" font-size="7.5" text-anchor="middle">High+Med+High confidence</text>
+
+        <rect x="778" y="412" width="148" height="48" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="852" y="434" fill="white" font-size="9" font-weight="600" text-anchor="middle">Email · Teams · Webhook</text>
+        <text x="852" y="452" fill="#94a3b8" font-size="7.5" text-anchor="middle">Digest · Custom routing</text>
+
+        <!-- Dead Letter -->
+        <rect x="778" y="484" width="148" height="42" rx="6" fill="rgba(136,19,55,0.2)" stroke="#fb7185" stroke-width="1.2" stroke-dasharray="4,4"/>
+        <text x="852" y="504" fill="#fb7185" font-size="8.5" font-weight="600" text-anchor="middle">⚠ Dead Letter</text>
+        <text x="852" y="520" fill="#94a3b8" font-size="7" text-anchor="middle">3× fail → log + health alert</text>
+
+        <!-- People -->
+        <rect x="955" y="196" width="135" height="48" rx="6" fill="rgba(30,41,59,0.35)" stroke="#94a3b8" stroke-width="1"/>
+        <text x="1022" y="218" fill="white" font-size="9" font-weight="600" text-anchor="middle">SOC Analysts</text>
+        <text x="1022" y="238" fill="#94a3b8" font-size="7.5" text-anchor="middle">Critical · Real-time</text>
+
+        <rect x="955" y="268" width="135" height="48" rx="6" fill="rgba(30,41,59,0.35)" stroke="#94a3b8" stroke-width="1"/>
+        <text x="1022" y="290" fill="white" font-size="9" font-weight="600" text-anchor="middle">IT Operations</text>
+        <text x="1022" y="310" fill="#94a3b8" font-size="7.5" text-anchor="middle">High · Patch alerts</text>
+
+        <rect x="955" y="340" width="135" height="48" rx="6" fill="rgba(30,41,59,0.35)" stroke="#94a3b8" stroke-width="1"/>
+        <text x="1022" y="362" fill="white" font-size="9" font-weight="600" text-anchor="middle">CISO / IR Team</text>
+        <text x="1022" y="382" fill="#94a3b8" font-size="7.5" text-anchor="middle">Medium · Weekly digest</text>
+
+        <!-- ============================================================
+             STORAGE
+             ============================================================ -->
+        <rect x="212" y="622" width="350" height="36" rx="5" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="387" y="640" fill="white" font-size="8.5" font-weight="600" text-anchor="middle">SQLite (pure Go) · 10 tables · Alert state: new→acked→false_pos→resolved</text>
+        <text x="387" y="654" fill="#94a3b8" font-size="7" text-anchor="middle">sources · events · alerts · tech_stack · risk_config · routing_rules · matchers_config · dedup_hashes · sighting_cache · notification_targets</text>
+
+        <!-- ============================================================
+             ARROWS
+             ============================================================ -->
+
+        <!-- CMDB → Admin API -->
+        <line x1="169" y1="180" x2="210" y2="180" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#a-sl)"/>
+        <text x="186" y="175" fill="#94a3b8" font-size="7" text-anchor="middle">CSV</text>
+
+        <!-- MISP → Pollers -->
+        <line x1="169" y1="360" x2="210" y2="230" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#a-am)"/>
+        <text x="186" y="290" fill="#fbbf24" font-size="7" text-anchor="middle">ALL events</text>
+        <text x="186" y="302" fill="#fbbf24" font-size="6" text-anchor="middle">no filter</text>
+
+        <!-- KEV → Pollers -->
+        <line x1="169" y1="456" x2="210" y2="246" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#a-bl)"/>
+        <text x="186" y="350" fill="#3b82f6" font-size="7" text-anchor="middle">JSON</text>
+
+        <!-- Org Profile → Tier 2 -->
+        <path d="M 91 127 L 91 500 Q 91 510 180 510 L 230 510 Q 240 510 240 519 L 240 540" fill="none" stroke="#3b82f6" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#a-bl)"/>
+        <text x="72" y="320" fill="#3b82f6" font-size="7" text-anchor="middle">sector</text>
+
+        <!-- Pollers → Normalizers -->
+        <line x1="472" y1="235" x2="488" y2="235" stroke="#34d399" stroke-width="1.2" marker-end="url(#a-em)"/>
+
+        <!-- Normalizers → Warning Filter -->
+        <line x1="611" y1="274" x2="611" y2="296" stroke="#34d399" stroke-width="1.2" marker-end="url(#a-em)"/>
+
+        <!-- Warning Filter → Queue -->
+        <line x1="611" y1="346" x2="611" y2="364" stroke="#34d399" stroke-width="1.2" marker-end="url(#a-em)"/>
+
+        <!-- Queue → Match Engine -->
+        <line x1="611" y1="404" x2="611" y2="433" stroke="#fb923c" stroke-width="1.5" marker-end="url(#a-or)"/>
+
+        <!-- Match → Risk -->
+        <line x1="472" y1="645" x2="472" y2="668" stroke="#34d399" stroke-width="1.5" marker-end="url(#a-em)"/>
+
+        <!-- Risk → Explainability -->
+        <line x1="339" y1="870" x2="339" y2="883" stroke="#34d399" stroke-width="1.5" marker-end="url(#a-em)"/>
+
+        <!-- Risk → Dedup -->
+        <line x1="472" y1="870" x2="606" y2="883" stroke="#34d399" stroke-width="1.5" marker-end="url(#a-em)"/>
+
+        <!-- Explain + Dedup → Router -->
+        <line x1="339" y1="937" x2="339" y2="956" stroke="#34d399" stroke-width="1.5" marker-end="url(#a-em)"/>
+        <line x1="606" y1="937" x2="606" y2="956" stroke="#34d399" stroke-width="1.5" marker-end="url(#a-em)"/>
+
+        <!-- Router → Outputs -->
+        <line x1="732" y1="975" x2="776" y2="228" stroke="#22d3ee" stroke-width="1.2" marker-end="url(#a-cy)"/>
+        <text x="748" y="600" fill="#22d3ee" font-size="7" text-anchor="middle">critical+high c.</text>
+
+        <line x1="732" y1="983" x2="776" y2="295" stroke="#22d3ee" stroke-width="1.2" marker-end="url(#a-cy)"/>
+        <text x="750" y="640" fill="#22d3ee" font-size="7" text-anchor="middle">critical+low c.</text>
+
+        <line x1="732" y1="991" x2="776" y2="365" stroke="#22d3ee" stroke-width="1.2" marker-end="url(#a-cy)"/>
+        <text x="750" y="690" fill="#22d3ee" font-size="7" text-anchor="middle">high+high c.</text>
+
+        <line x1="732" y1="999" x2="776" y2="435" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#a-sl)"/>
+        <text x="752" y="720" fill="#94a3b8" font-size="7" text-anchor="middle">digest · custom</text>
+
+        <line x1="732" y1="995" x2="776" y2="506" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a-sl)"/>
+        <text x="752" y="760" fill="#fb7185" font-size="7" text-anchor="middle">3× fail</text>
+
+        <!-- Output → People -->
+        <line x1="926" y1="222" x2="953" y2="222" stroke="#22d3ee" stroke-width="1" marker-end="url(#a-cy)"/>
+        <line x1="926" y1="295" x2="953" y2="295" stroke="#22d3ee" stroke-width="1" marker-end="url(#a-cy)"/>
+        <line x1="926" y1="365" x2="953" y2="365" stroke="#22d3ee" stroke-width="1" marker-end="url(#a-cy)"/>
+
+        <!-- DB arrows -->
+        <path d="M 350 435 L 350 408 L 512 408" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#a-vi)"/>
+        <text x="435" y="403" fill="#a78bfa" font-size="7">tech stack</text>
+
+        <path d="M 260 670 L 260 660" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#a-vi)"/>
+
+        <path d="M 550 622 L 550 545" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#a-vi)"/>
+        <text x="558" y="585" fill="#a78bfa" font-size="7">read</text>
+
+        <!-- Sighting data bypass -->
+        <path d="M 91 410 L 91 750 Q 91 760 180 760 L 210 760" fill="none" stroke="#3b82f6" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#a-bl)"/>
+        <text x="72" y="600" fill="#3b82f6" font-size="7" text-anchor="middle">sightings</text>
+
+        <!-- Health -->
+        <rect x="212" y="1020" width="520" height="14" rx="3" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="0.5"/>
+        <text x="472" y="1031" fill="#94a3b8" font-size="7" text-anchor="middle">GET /health · GET /metrics · stdout logging · Dead letter alerts · Graceful shutdown (SIGTERM → drain queue → close DB)</text>
+
+        <!-- ============================================================
+             LEGEND
+             ============================================================ -->
+        <rect x="778" y="570" width="312" height="210" rx="6" fill="rgba(15,23,42,0.6)" stroke="#1e293b" stroke-width="1"/>
+        <text x="934" y="594" fill="white" font-size="10" font-weight="600" text-anchor="middle">Legend</text>
+
+        <rect x="790" y="610" width="14" height="10" rx="2" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="812" y="620" fill="#94a3b8" font-size="8">MISP (v1 primary source)</text>
+
+        <rect x="790" y="630" width="14" height="10" rx="2" fill="rgba(59,130,246,0.12)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="812" y="640" fill="#94a3b8" font-size="8">CISA KEV / Tier 2 / Sector</text>
+
+        <rect x="790" y="650" width="14" height="10" rx="2" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="812" y="660" fill="#94a3b8" font-size="8">Core pipeline / Matching</text>
+
+        <rect x="790" y="670" width="14" height="10" rx="2" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1"/>
+        <text x="812" y="680" fill="#94a3b8" font-size="8">Auth / Filter / Dead Letter</text>
+
+        <rect x="790" y="690" width="14" height="10" rx="2" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="812" y="700" fill="#94a3b8" font-size="8">SQLite Database</text>
+
+        <rect x="790" y="710" width="14" height="10" rx="2" fill="rgba(251,146,60,0.15)" stroke="#fb923c" stroke-width="1"/>
+        <text x="812" y="720" fill="#94a3b8" font-size="8">Event Queue (channel)</text>
+
+        <rect x="790" y="730" width="14" height="10" rx="2" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="812" y="740" fill="#94a3b8" font-size="8">Notification Target</text>
+
+        <line x1="790" y1="752" x2="804" y2="752" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="812" y="754" fill="#94a3b8" font-size="8">DB read/write</text>
+
+        <line x1="924" y1="752" x2="938" y2="752" stroke="#a78bfa" stroke-width="1" stroke-dasharray="5,4"/>
+        <text x="946" y="754" fill="#94a3b8" font-size="8">Feedback loop</text>
+
+        <line x1="790" y1="770" x2="804" y2="770" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="812" y="772" fill="#94a3b8" font-size="8">Dead letter / failure</text>
+      </svg>
+</svg>
