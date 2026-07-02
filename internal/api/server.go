@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"log"
@@ -384,6 +385,9 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 		CreatedAt   string `json:"created_at"`
 		Explanation string `json:"explanation"`
 		Action      string `json:"action"`
+		RiskScore   float64 `json:"risk_score"`
+		SSVCAction  string  `json:"ssvc_action"`
+		CVE         string  `json:"cve"`
 	}
 
 	var alerts []alertRow
@@ -392,6 +396,9 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&a.ID, &a.EventID, &a.Severity, &a.Confidence, &a.Status, &a.MatchedApps, &a.CreatedAt, &a.Explanation, &a.Action); err != nil {
 			continue
 		}
+		a.RiskScore = parseRiskScore(a.Explanation)
+		a.SSVCAction = ssvcShort(a.Action)
+		a.CVE = extractCVE(a.EventID)
 		alerts = append(alerts, a)
 	}
 
@@ -399,6 +406,55 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 		"alerts": alerts,
 		"count":  len(alerts),
 	})
+}
+
+// parseRiskScore extracts the risk score from the explanation text.
+// Looks for "Risk Score: 0.71" pattern.
+func parseRiskScore(explanation string) float64 {
+	idx := strings.Index(explanation, "Risk Score: ")
+	if idx < 0 {
+		return 0
+	}
+	start := idx + len("Risk Score: ")
+	end := start
+	for end < len(explanation) && ((explanation[end] >= '0' && explanation[end] <= '9') || explanation[end] == '.') {
+		end++
+	}
+	if end > start {
+		var f float64
+		fmt.Sscanf(explanation[start:end], "%f", &f)
+		return f
+	}
+	return 0
+}
+
+// ssvcShort maps full SSVC action labels to short codes.
+func ssvcShort(action string) string {
+	switch action {
+	case "Act Now":
+		return "act"
+	case "Schedule", "Attend":
+		return "attend"
+	default:
+		return "track"
+	}
+}
+
+// extractCVE pulls a CVE ID from an event ID if present.
+func extractCVE(eventID string) string {
+	if strings.HasPrefix(eventID, "CVE-") {
+		return eventID
+	}
+	// Also check for KEV format like "CVE-2024-3400"
+	idx := strings.Index(eventID, "CVE-")
+	if idx >= 0 {
+		end := idx + 4
+		for end < len(eventID) && ((eventID[end] >= '0' && eventID[end] <= '9') || eventID[end] == '-') {
+			end++
+		}
+		return eventID[idx:end]
+	}
+	return eventID
 }
 
 func (s *Server) handleAlertDetail(w http.ResponseWriter, r *http.Request) {
