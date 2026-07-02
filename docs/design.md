@@ -597,7 +597,9 @@ Pure Go driver (modernc.org/sqlite). Tables from migration 001:
 | **matchers_config** | Enabled matchers and their config | Yes |
 | **dedup_hashes** | TTL cache for dedup | Yes |
 | **sighting_cache** | Recent sighting counts per CVE | Yes |
-| **notification_targets** | Slack/Teams/Email/webhook connection config | Yes |
+|| **notification_targets** | Slack/Teams/Email/webhook connection config | Yes |
+|| **users** | User accounts with password hash and role (admin/reader) | Yes |
+|| **sessions** | Active login sessions with token, username, role, expiry | Yes |
 
 **Alert State Machine:**
 ```
@@ -653,25 +655,32 @@ On import: delta detection — new apps trigger re-scan of recent events, remove
 
 ### 15. REST API (GET, port 8080)
 
-- `GET /api/alerts` — list alerts with filters (severity, confidence, status, team, source, date range)
-- `GET /api/alerts/:id` — single alert with full explanation
-- `GET /api/techstack` — current tech stack
-- `GET /api/sources` — configured sources and their status
-- `GET /health` — MISP reachable? KEV updated? Queue depth? Last pull? Dead letter count?
-- `GET /metrics` — Prometheus-format metrics
+All endpoints require authentication (session cookie or `X-Arbiter-Key` header). `/health` is the only public endpoint.
 
-### 16. Admin API (POST/PUT, port 8080, auth required)
+- `GET /login` — login page (HTML)
+- `POST /auth/login` — authenticate, receive session cookie `{username, password}`
+- `POST /auth/logout` — clear session
+- `GET /auth/session` — current user `{username, role}`
+- `GET /api/alerts` — list alerts with filters (`?severity=`, `?status=`, `?q=`, `?app=`)
+- `GET /api/alerts/:id` — single alert with full explanation, action, routed_to
+- `GET /api/techstack` — current tech stack with all fields
+- `GET /api/stats` — alert counts by severity + apps tracked
+- `GET /health` — public. MISP status, KEV entries, alert counts
 
-- `POST /admin/import` — upload techstack.csv, triggers delta detection
-- `PUT /admin/routing` — update routing.yaml
-- `PUT /admin/risk` — update risk.yaml
-- `PUT /admin/sources` — update sources.yaml
-- `PUT /admin/matchers` — enable/disable matchers
-- `POST /admin/ack/:alert_id` — acknowledge alert
-- `POST /admin/resolve/:alert_id` — resolve (patched or false_pos)
+### 16. Admin API (POST/PUT/DELETE, port 8080, auth + admin role required)
+
+- `POST /admin/import` — upload techstack.csv, delta detection
+- `POST /admin/ack/:alert_id` — update alert status (`acked`, `false_pos`, `resolved`)
 - `POST /admin/pull` — trigger immediate pull from all sources
+- `POST /admin/techstack` — add single app
+- `PUT /admin/techstack` — update single app
+- `DELETE /admin/techstack` — remove single app `{name}`
+- `GET /admin/users` — list all users
+- `POST /admin/users` — create user `{username, password, role}`
+- `PUT /admin/users` — update user role/password
+- `DELETE /admin/users` — remove user `{username}` (cannot delete last admin)
 
-Auth: `X-Threatlib-Key` header. Server binds localhost by default.
+Auth: Session cookie (`arbiter_session`) or `X-Arbiter-Key` header. Admin endpoints additionally require `role=admin` (session) or the API key always has admin privileges.
 
 ### 17. Health & Observability
 
@@ -689,6 +698,58 @@ SIGTERM/SIGINT:
 5. Exit
 
 Timeout: 30 seconds. If not drained, log remaining count.
+
+### 19. User Account System (Auth)
+
+Multi-user authentication with role-based access control. No external auth provider needed — everything is self-contained in SQLite.
+
+**Roles:**
+
+| Role | Permissions |
+|---|---|
+| **admin** | Full access: view alerts, manage tech stack (add/edit/delete), import CSV, manage users, configure settings |
+| **reader** | View-only: alerts list, alert details, tech stack view. No write access. |
+
+**Auth flow:**
+
+1. Unauthenticated user hits `/` → redirected to `/login`
+2. Login page: username + password → POST `/auth/login`
+3. Server verifies password (SHA-256 + random salt) → creates session token (crypto/rand, 64-char hex)
+4. Session stored in `sessions` table with 12-hour expiry
+5. `arbiter_session` cookie set (HttpOnly, SameSite=Strict)
+6. All protected routes check session cookie OR `X-Arbiter-Key` header (backward compat for programmatic access)
+7. Logout: POST `/auth/logout` → delete session + clear cookie
+8. Expired sessions cleaned on each request
+
+**Default admin:** On first start with empty `users` table, a default admin user is seeded: `admin` / `arbiter`. The user should change this password immediately.
+
+**Password hashing:** SHA-256 with 16-byte random salt, stored as `hex(salt):hex(hash)`. Chosen over bcrypt to keep zero external dependencies — sufficient for an internal SOC tool. Upgrade path to bcrypt is a migration away if needed.
+
+**User management (admin only):**
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/admin/users` | GET | List all users |
+| `/admin/users` | POST | Create user `{username, password, role}` |
+| `/admin/users` | PUT | Update user role/password |
+| `/admin/users` | DELETE | Remove user (cannot delete last admin) |
+
+### 20. Web Dashboard
+
+Single-page application served from the embedded `dashboard.html`. Pure HTML/CSS/JS — no framework, no build step.
+
+**Screens:**
+- **Alerts** — searchable/filterable table with severity badges, confidence, status. Click row → detail modal with full risk breakdown and explanation.
+- **Tech Stack** — inline-editable table. Version (contenteditable), criticality (dropdown), internet-facing (dropdown). Add/delete apps with custom confirmation dialog (avoids Chrome's "don't show again" bug with native `confirm()`).
+- **Import CSV** — drag-and-drop bulk upload with delta detection.
+- **Users** (admin only) — user list with add/edit/delete, role assignment.
+- **Settings** — admin API key, Slack/Teams/Email webhook URLs (stored in localStorage).
+
+**Design:** Flat GitHub-dark aesthetic — #0a0e14 background, #12171e cards, #1c2128 borders. No gradients, no animations beyond subtle hover transitions. Monospace font for event IDs. Zero external CSS dependencies (Tailwind CDN removed).
+
+**Role-based UI:** Admin-only elements (Import tab, Users tab, Settings, +Add App, delete buttons) hidden via `.admin-only` class when `role=reader`. Reader-only message shown in Tech Stack tab.
+
+**Custom confirmation dialog:** Replaces browser-native `confirm()` which Chrome/Edge can permanently suppress via "don't show this message again" checkbox. Custom Promise-based bar renders at top of viewport with Delete/Cancel buttons — immune to browser suppression.
 
 ---
 
@@ -824,6 +885,10 @@ binary that runs in their existing environment is an easy yes.
 | Single binary, one per org (v1) | Deploy in minutes. Multi-tenancy is a v2 feature; schema supports it already. |
 || Initial thresholds are uncalibrated guesses | Config-file tunable. Calibration requires production data. |
 || **Pull-all, filter-local architecture** | Pre-filtering at the MISP API level (by galaxy, tag, or CVE) would miss relevant threats: an untracked threat actor exploiting a CVE in your stack, an event without galaxy tags but with sector-relevant taxonomies, or a feed you haven't subscribed to. The matching engine has the full org context to decide relevance. MISP is treated as an aggregation channel — the arbiter benefits from all upstream enrichment without per-feed connectors. |
+|| **Multi-user auth with roles** | SOC teams need separate logins. Admin/reader split means analysts see alerts without accidentally modifying tech stack. Self-contained in SQLite — no external IdP dependency for v1. |
+|| **SHA-256 + salt over bcrypt** | Stdlib-only. Sufficient for internal tool. Upgrade path to bcrypt is one migration. |
+|| **Custom confirm dialog over browser confirm()** | Chrome/Edge can permanently suppress native `confirm()` via "don't show again" — breaks delete flows. Custom Promise-based bar is immune. |
+|| **Tech stack deletion: stops future, not past** | Deleting an app from tech stack stops future CVE matching but preserves historical alerts. Correct for a security tool — alerts are evidence, never silently removed. Users should bulk-resolve or mark false_pos on existing alerts. |
 
 ---
 
@@ -838,6 +903,8 @@ binary that runs in their existing environment is an easy yes.
 - Explain every decision
 - Route by severity AND confidence
 - Track alert lifecycle with false positive feedback
+- Authenticate users with role-based access (admin/reader)
+- Serve a web dashboard with inline editing, search, and filtering
 - Expose health and metrics
 - Shut down gracefully
 
@@ -860,7 +927,10 @@ binary that runs in their existing environment is an easy yes.
 | Transitive/bundled vulnerabilities not detected | Documented. SBOM integration planned for v2. |
 | Multiplicative scoring punishes moderate-on-all-axes threats | Raw-points/max-points formula with calibrated max values mitigates this. |
 | v1 audience limited to MISP users | KEV provides immediate second source. v2 roadmap: GitHub Advisory + generic connectors for non-MISP orgs. |
-| One binary per org (no multi-tenancy) | Schema supports it. Deployment model is a v1 simplification. |
+|| One binary per org (no multi-tenancy) | Schema supports it. Deployment model is a v1 simplification. |
+|| Password hashing uses SHA-256 + salt (not bcrypt) | Sufficient for internal tool. Migration to bcrypt requires one ALTER TABLE + code change. |
+|| No MFA / SSO | Self-contained auth for v1. OIDC/SAML integration is a v2 feature. |
+|| Tech stack deletion preserves historical alerts | By design. Users must manually bulk-resolve or mark false_pos on existing alerts for removed apps. |
 
 ---
 
@@ -905,16 +975,16 @@ threat-intel-arbiter/
 │   │   ├── email.go               # SMTP sender
 │   │   └── webhook.go             # Generic webhook
 │   ├── api/                       # HTTP handlers
-│   │   ├── server.go              # Server setup
-│   │   ├── rest.go                # GET endpoints
-│   │   ├── admin.go               # POST/PUT endpoints (auth)
-│   │   └── middleware.go           # Auth, logging, CORS
+│   │   ├── server.go              # Server setup, route registration
+│   │   ├── auth.go                # Login, logout, session, auth middleware
+│   │   └── dashboard.html         # Embedded web dashboard (SPA)
 │   ├── store/                     # SQLite database layer
-│   │   ├── db.go                  # Connection, migrations
+│   │   ├── db.go                  # Connection, migrations, admin seed
 │   │   ├── sources.go             # Sources CRUD
 │   │   ├── events.go              # Event CRUD
 │   │   ├── alerts.go              # Alert CRUD + state machine
 │   │   ├── techstack.go           # Tech stack + delta detection
+│   │   ├── users.go               # User accounts + password hashing + sessions
 │   │   └── config.go              # Risk/routing/matchers config
 │   ├── config/                    # Configuration loading
 │   │   └── config.go              # Parse YAML + CSV, validate
