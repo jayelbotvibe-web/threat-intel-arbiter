@@ -16,8 +16,6 @@ Threat Intel Arbiter transforms raw threat intelligence from MISP and CISA KEV i
 
 Every alert includes: **Severity** + **Confidence** + **Action** + **Explanation** with full risk score breakdown.
 
-> **💡 The real moat:** months of operational data produce a false-positive feedback loop whose calibration a competitor can't replicate without the same production history.
-
 **👥 Who it's for:** SOC analysts and one-person security teams drowning in MISP feeds — if you need signal instead of noise, prioritised alerts mapped to your actual tech stack.
 
 ---
@@ -92,12 +90,11 @@ Open **http://localhost:8080** — login with username `admin` and the password 
 
 1. **Pull** — fetches ALL events from MISP (no galaxy/tag/CVE pre-filter). MISP acts as an aggregation channel for peers, ISACs, OSINT feeds, commercial, and government sources. Filtering happens locally against your context.
 2. **Normalize** — extracts CVEs, CVSS, tags, threat actors, references, AND IOCs (IPs, domains, hashes) for EDR integration. Canonical ThreatEvent model is source-agnostic.
-3. **Filter** — drops TLP:RED, disputed CVEs, known false positives via MISP warning lists.
+3. **Filter** — drops TLP:RED, disputed CVEs, known false positives via MISP warning lists and noticelists. (Analyst FP marking / feedback loop on roadmap.)
 4. **Match** — pluggable matchers: CVEMatcher (version-aware), SectorMatcher (taxonomy tags), KEVMatcher (active exploitation).
 5. **Score** — 4 dimensions: Likelihood × Impact × Exposure ÷ max, with Confidence as a separate dimension.
 6. **Explain** — human-readable breakdown from the same struct that computed the score. No separate code path.
 7. **Route** — by severity + confidence. Critical+high → #sec-alerts. Medium → weekly digest. Low → log only. IOCs → CrowdStrike Falcon EDR.
-8. **Feedback** — false positives marked by analysts feed back into risk calibration.
 
 ### Why Pull-All, Filter-Local
 
