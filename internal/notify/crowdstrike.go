@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ import (
 // CrowdstrikeNotifier sends IOCs to Crowdstrike Falcon for EDR integration.
 // Authenticates via OAuth2 (client_id + client_secret) and auto-refreshes tokens.
 // In mock mode (CLIENT_ID not set), logs instead of sending.
+// Safe-by-default: action=detect unless explicit approval gate is met.
 type CrowdstrikeNotifier struct {
 	BaseURL    string
 	ClientID   string
@@ -27,13 +29,16 @@ type CrowdstrikeNotifier struct {
 	Expiration int    // days until IOC expires
 	Mock       bool
 
-	mu       sync.Mutex
-	token    string
-	expires  time.Time
-	sent     map[string]bool // dedup: "type:value" → true
-	client   *http.Client
-	pending  []csIndicator // batched IOCs
-	flushCh  chan struct{} // signal to flush batch
+	mu         sync.Mutex // protects sent, pending, flushCh
+	tokenMu    sync.Mutex // protects token, expires, tokenRefreshing
+	token      string
+	expires    time.Time
+	refreshing bool // single-flight guard for token refresh
+	sent       map[string]bool
+	client     *http.Client
+	pending    []csIndicator
+	flushCh    chan struct{}
+	closed     chan struct{} // closed on shutdown for graceful drain
 }
 
 // NewCrowdstrikeNotifier creates a Crowdstrike notifier from environment variables.
@@ -50,16 +55,28 @@ func NewCrowdstrikeNotifier() *CrowdstrikeNotifier {
 		sent:       make(map[string]bool),
 		pending:    make([]csIndicator, 0, 100),
 		flushCh:    make(chan struct{}, 1),
+		closed:     make(chan struct{}),
 		client:     &http.Client{Timeout: 30 * time.Second},
 	}
 	if exp := os.Getenv("CROWDSTRIKE_EXPIRATION"); exp != "" {
-		fmt.Sscanf(exp, "%d", &cs.Expiration)
+		if n, err := fmt.Sscanf(exp, "%d", &cs.Expiration); err != nil || n != 1 {
+			log.Printf("crowdstrike: invalid CROWDSTRIKE_EXPIRATION %q, using default %d", exp, cs.Expiration)
+		}
 	}
-	// Background flusher: send batched IOCs every 30 seconds
+	log.Printf("crowdstrike: action=%s severity=%s expiration=%dd mock=%v",
+		cs.Action, cs.Severity, cs.Expiration, cs.Mock)
 	if !cs.Mock {
 		go cs.flusher()
 	}
 	return cs
+}
+
+// Close shuts down the flusher and performs a final flush of pending IOCs.
+func (c *CrowdstrikeNotifier) Close() {
+	close(c.closed)
+	if !c.Mock {
+		c.flush()
+	}
 }
 
 // flusher periodically sends batched IOCs.
@@ -68,6 +85,8 @@ func (c *CrowdstrikeNotifier) flusher() {
 	defer ticker.Stop()
 	for {
 		select {
+		case <-c.closed:
+			return
 		case <-ticker.C:
 			c.flush()
 		case <-c.flushCh:
@@ -92,9 +111,12 @@ func (c *CrowdstrikeNotifier) Notify(event model.ThreatEvent, severity, confiden
 
 	for _, ioc := range event.IOCs {
 		key := string(ioc.Type) + ":" + ioc.Value
+		c.mu.Lock()
 		if c.sent[key] {
-			continue // already sent in a previous cycle
+			c.mu.Unlock()
+			continue
 		}
+		c.mu.Unlock()
 
 		// Build description from the IOC's own comment, not the event title
 		desc := ioc.Description
@@ -115,7 +137,9 @@ func (c *CrowdstrikeNotifier) Notify(event model.ThreatEvent, severity, confiden
 		}
 
 		if c.Mock {
+			c.mu.Lock()
 			c.sent[key] = true
+			c.mu.Unlock()
 			sent++
 			continue
 		}
@@ -136,7 +160,7 @@ func (c *CrowdstrikeNotifier) Notify(event model.ThreatEvent, severity, confiden
 	}
 
 	if c.Mock && sent > 0 {
-		log.Printf("crowdstrike [MOCK]: would send %d IOCs from event %s (%d total sent)", sent, event.ID, len(c.sent))
+		log.Printf("crowdstrike [MOCK]: would send %d IOCs from event %s (%d total sent)", sent, event.ID, c.sentCount())
 	}
 
 	return sent, nil
@@ -164,18 +188,33 @@ func (c *CrowdstrikeNotifier) flush() {
 }
 
 // getToken returns a valid OAuth2 access token, refreshing if needed.
+// Releases the lock before making HTTP calls — single-flight pattern.
 func (c *CrowdstrikeNotifier) getToken() (string, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	c.tokenMu.Lock()
 	if c.token != "" && time.Now().Before(c.expires) {
-		return c.token, nil
+		tok := c.token
+		c.tokenMu.Unlock()
+		return tok, nil
 	}
+	if c.refreshing {
+		// Another goroutine is already refreshing — wait briefly
+		c.tokenMu.Unlock()
+		time.Sleep(100 * time.Millisecond)
+		return c.getToken()
+	}
+	c.refreshing = true
+	c.tokenMu.Unlock()
 
-	url := c.BaseURL + "/oauth2/token"
-	body := fmt.Sprintf("client_id=%s&client_secret=%s", c.ClientID, c.Secret)
-	req, err := http.NewRequest("POST", url, bytes.NewReader([]byte(body)))
+	endpoint := c.BaseURL + "/oauth2/token"
+	body := url.Values{
+		"client_id":     {c.ClientID},
+		"client_secret": {c.Secret},
+	}.Encode()
+	req, err := http.NewRequest("POST", endpoint, bytes.NewReader([]byte(body)))
 	if err != nil {
+		c.tokenMu.Lock()
+		c.refreshing = false
+		c.tokenMu.Unlock()
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -183,12 +222,24 @@ func (c *CrowdstrikeNotifier) getToken() (string, error) {
 
 	resp, err := c.client.Do(req)
 	if err != nil {
+		c.tokenMu.Lock()
+		c.refreshing = false
+		c.tokenMu.Unlock()
 		return "", fmt.Errorf("oauth2: %w", err)
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.tokenMu.Lock()
+		c.refreshing = false
+		c.tokenMu.Unlock()
+		return "", fmt.Errorf("oauth2 read: %w", err)
+	}
 	if resp.StatusCode >= 400 {
+		c.tokenMu.Lock()
+		c.refreshing = false
+		c.tokenMu.Unlock()
 		return "", fmt.Errorf("oauth2 error %d: %s", resp.StatusCode, string(respBody))
 	}
 
@@ -198,12 +249,20 @@ func (c *CrowdstrikeNotifier) getToken() (string, error) {
 		TokenType   string `json:"token_type"`
 	}
 	if err := json.Unmarshal(respBody, &tokenResp); err != nil {
+		c.tokenMu.Lock()
+		c.refreshing = false
+		c.tokenMu.Unlock()
 		return "", fmt.Errorf("oauth2 parse: %w", err)
 	}
 
+	c.tokenMu.Lock()
 	c.token = tokenResp.AccessToken
-	c.expires = time.Now().Add(time.Duration(tokenResp.ExpiresIn-60) * time.Second) // buffer
-	return c.token, nil
+	c.expires = time.Now().Add(time.Duration(tokenResp.ExpiresIn-60) * time.Second)
+	c.refreshing = false
+	tok := c.token
+	c.tokenMu.Unlock()
+
+	return tok, nil
 }
 
 // send posts a batch of IOCs to Crowdstrike Falcon API.
@@ -226,8 +285,8 @@ func (c *CrowdstrikeNotifier) send(indicators []csIndicator) (int, error) {
 		return 0, fmt.Errorf("auth: %w", err)
 	}
 
-	url := c.BaseURL + "/indicators/entities/iocs/v1"
-	req, err := http.NewRequest("POST", url, bytes.NewReader(payload))
+	csURL := c.BaseURL + "/indicators/entities/iocs/v1"
+	req, err := http.NewRequest("POST", csURL, bytes.NewReader(payload))
 	if err != nil {
 		return 0, fmt.Errorf("request: %w", err)
 	}
@@ -245,8 +304,15 @@ func (c *CrowdstrikeNotifier) send(indicators []csIndicator) (int, error) {
 		return 0, fmt.Errorf("crowdstrike API error %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	log.Printf("crowdstrike: sent %d IOCs (status %d, total sent %d)", len(indicators), resp.StatusCode, len(c.sent))
+	log.Printf("crowdstrike: sent %d IOCs (status %d, total sent %d)", len(indicators), resp.StatusCode, c.sentCount())
 	return len(indicators), nil
+}
+
+// sentCount returns the number of deduplicated IOCs under the mutex.
+func (c *CrowdstrikeNotifier) sentCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.sent)
 }
 
 // ─── Types ───
