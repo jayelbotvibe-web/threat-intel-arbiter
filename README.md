@@ -49,7 +49,7 @@ Those platforms are heavyweight — they require infrastructure, dedicated admin
 
 [![Threat Intel Arbiter Architecture](docs/architecture-overview.jpg)](https://jayelbotvibe-web.github.io/threat-intel-arbiter/architecture.html)
 
-*Click the diagram → interactive architecture page with detail drawers for every component.*
+*[Click the diagram → interactive architecture page](https://jayelbotvibe-web.github.io/threat-intel-arbiter/architecture.html) with detail drawers for every component.*
 
 Six-band pipeline: Ingest → Normalize → Buffer → Correlate & Score → Persist → Respond & Present — all in a single Go binary.
 
