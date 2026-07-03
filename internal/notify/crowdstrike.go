@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -118,6 +121,26 @@ func (c *CrowdstrikeNotifier) Notify(event model.ThreatEvent, severity, confiden
 		}
 		c.mu.Unlock()
 
+		// P0-2: Validate and clean the IOC value
+		clean := validateIOC(string(ioc.Type), ioc.Value)
+		if clean == "" {
+			log.Printf("crowdstrike: dropped invalid IOC %s=%q from %s", ioc.Type, ioc.Value, event.ID)
+			continue
+		}
+		// P0-3: Block private IP ranges
+		if (ioc.Type == model.IOCIPv4 || ioc.Type == model.IOCIPv6) && isPrivateIP(clean) {
+			log.Printf("crowdstrike: blocked private IP %s from %s", clean, event.ID)
+			continue
+		}
+		// P0-4: Check TLP export boundary
+		if blockedTLP(append(ioc.Tags, event.Tags...)) {
+			log.Printf("crowdstrike: blocked TLP-restricted IOC %s=%s from %s", ioc.Type, ioc.Value, event.ID)
+			continue
+		}
+
+		// Dedup key uses cleaned value
+		dedupKey := string(ioc.Type) + ":" + clean
+
 		// Build description from the IOC's own comment, not the event title
 		desc := ioc.Description
 		if desc == "" || desc == event.Title {
@@ -129,16 +152,16 @@ func (c *CrowdstrikeNotifier) Notify(event model.ThreatEvent, severity, confiden
 			Action:      c.Action,
 			Expiration:  expiration,
 			Type:        string(ioc.Type),
-			Value:       ioc.Value,
-			Description: desc,
+			Value:       clean,
+			Description: cleanDesc(desc),
 			Severity:    csSev,
 			Platforms:   []string{"windows", "mac", "linux"},
-			Tags:        append(event.Tags, event.CVEs...),
+			Tags:        copyTags(event),
 		}
 
 		if c.Mock {
 			c.mu.Lock()
-			c.sent[key] = true
+			c.sent[dedupKey] = true
 			c.mu.Unlock()
 			sent++
 			continue
@@ -146,7 +169,6 @@ func (c *CrowdstrikeNotifier) Notify(event model.ThreatEvent, severity, confiden
 
 		c.mu.Lock()
 		c.pending = append(c.pending, indicator)
-		c.sent[key] = true
 		c.mu.Unlock()
 		sent++
 
@@ -180,9 +202,19 @@ func (c *CrowdstrikeNotifier) flush() {
 
 	if _, err := c.send(batch); err != nil {
 		log.Printf("crowdstrike: flush error: %v (re-queuing)", err)
-		// Re-queue on failure
 		c.mu.Lock()
 		c.pending = append(batch, c.pending...)
+		if len(c.pending) > 1000 {
+			log.Printf("crowdstrike: pending overflow (%d), dropping %d oldest", len(c.pending), len(c.pending)-1000)
+			c.pending = c.pending[len(c.pending)-1000:]
+		}
+		c.mu.Unlock()
+	} else {
+		// Mark delivered IOCs as sent (dedup after confirmed 2xx)
+		c.mu.Lock()
+		for _, ind := range batch {
+			c.sent[ind.Type+":"+ind.Value] = true
+		}
 		c.mu.Unlock()
 	}
 }
@@ -354,9 +386,127 @@ func mapToCSSeverity(sev string) string {
 	}
 }
 
+// cleanDesc sanitizes the IOC description — caps length, strips control chars.
+func cleanDesc(d string) string {
+	if len(d) > 256 {
+		d = d[:256]
+	}
+	return strings.Map(func(r rune) rune {
+		if r < 32 && r != '\n' && r != '\t' {
+			return -1
+		}
+		return r
+	}, d)
+}
+
+// copyTags creates a fresh slice from event tags + CVEs to prevent aliasing.
+func copyTags(event model.ThreatEvent) []string {
+	tags := make([]string, 0, len(event.Tags)+len(event.CVEs))
+	tags = append(tags, event.Tags...)
+	tags = append(tags, event.CVEs...)
+	return tags
+}
+
 func envOrDefault(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
 	return def
+}
+
+// ─── IOC validation, denylist, and TLP guards ───
+
+var (
+	// RFC1918, loopback, link-local, CGNAT, multicast — never send to EDR.
+	privateNets = []string{
+		"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", // RFC1918
+		"127.0.0.0/8",    // loopback
+		"169.254.0.0/16", // link-local
+		"100.64.0.0/10",  // CGNAT
+		"224.0.0.0/4",    // multicast
+		"0.0.0.0/8",      // current network
+		"240.0.0.0/4",    // reserved
+	}
+	// Common defang patterns to refang.
+	defangRE = regexp.MustCompile(`\[\.\]|\(dot\)|hxxps?://|hxxp://|\\[.\\]`)
+	// Valid domain name (hostname label)
+	domainRE = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*\.?$`)
+)
+
+// validateIOC checks the IOC value and returns the cleaned value or empty string if invalid.
+func validateIOC(iocType string, value string) string {
+	v := strings.TrimSpace(strings.ToLower(defangRE.ReplaceAllString(value, ".")))
+	v = strings.ReplaceAll(v, "hxxp://", "")
+	v = strings.ReplaceAll(v, "hxxps://", "")
+
+	switch iocType {
+	case "ipv4", "ipv6":
+		if ip := net.ParseIP(v); ip != nil {
+			return ip.String()
+		}
+		return ""
+	case "domain":
+		if domainRE.MatchString(v) && !strings.HasSuffix(v, ".local") {
+			return v
+		}
+		return ""
+	case "hash_sha256":
+		if len(v) == 64 && isHex(v) {
+			return v
+		}
+		return ""
+	case "hash_md5":
+		if len(v) == 32 && isHex(v) {
+			return v
+		}
+		return ""
+	default:
+		return ""
+	}
+}
+
+func isHex(s string) bool {
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+// isPrivateIP returns true if the IP is in a private/reserved range.
+func isPrivateIP(ip string) bool {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return true // can't parse = reject
+	}
+	for _, cidr := range privateNets {
+		_, net, _ := net.ParseCIDR(cidr)
+		if net != nil && net.Contains(parsed) {
+			return true
+		}
+	}
+	return false
+}
+
+// blockedTLP returns true if the IOC's TLP marking is above the export threshold.
+// Default: allow green/clear only; block amber/red unless opted in.
+func blockedTLP(tags []string) bool {
+	maxTLP := os.Getenv("CROWDSTRIKE_MAX_TLP")
+	if maxTLP == "" {
+		maxTLP = "green"
+	}
+	tlpRanks := map[string]int{"red": 4, "amber": 3, "green": 2, "white": 1, "clear": 1}
+	threshold := tlpRanks[strings.ToLower(maxTLP)]
+	for _, tag := range tags {
+		if strings.HasPrefix(strings.ToLower(tag), "tlp:") {
+			parts := strings.SplitN(tag, ":", 2)
+			if len(parts) == 2 {
+				if level, ok := tlpRanks[strings.ToLower(parts[1])]; ok {
+					return level > threshold
+				}
+			}
+		}
+	}
+	return false // no TLP = default allow (open source feeds)
 }
