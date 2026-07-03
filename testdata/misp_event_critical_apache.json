@@ -1,0 +1,200 @@
+{
+  "response": [
+    {
+      "Event": {
+        "id": "1001",
+        "orgc_id": "1",
+        "org_id": "1",
+        "date": "2024-07-12",
+        "threat_level_id": "1",
+        "info": "CVE-2024-38472 — Apache HTTP Server Vulnerability (ACTIVE EXPLOITATION)",
+        "published": true,
+        "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "attribute_count": "3",
+        "analysis": "2",
+        "timestamp": "1720789200",
+        "distribution": "3",
+        "sharing_group_id": "0",
+        "proposal_email_lock": false,
+        "locked": false,
+        "publish_timestamp": "1720789200",
+        "extends_uuid": "",
+        "disable_correlation": false,
+        "Org": {
+          "id": "1",
+          "name": "CIRCL",
+          "uuid": "circl-org-uuid-0001"
+        },
+        "Orgc": {
+          "id": "1",
+          "name": "CIRCL",
+          "uuid": "circl-org-uuid-0001"
+        },
+        "Tag": [
+          {
+            "id": "101",
+            "name": "tlp:amber",
+            "colour": "#FFA500",
+            "exportable": true,
+            "org_id": "0",
+            "user_id": "0",
+            "hide_tag": false,
+            "numerical_value": null
+          },
+          {
+            "id": "102",
+            "name": "exploit:in-the-wild",
+            "colour": "#FF0000",
+            "exportable": true,
+            "org_id": "0",
+            "user_id": "0",
+            "hide_tag": false,
+            "numerical_value": null
+          },
+          {
+            "id": "103",
+            "name": "eu-nis-oes:eu-nis-oes-manufacturing",
+            "colour": "#0000FF",
+            "exportable": true,
+            "org_id": "0",
+            "user_id": "0",
+            "hide_tag": false,
+            "numerical_value": null
+          },
+          {
+            "id": "104",
+            "name": "workflow:state=\"complete\"",
+            "colour": "#008000",
+            "exportable": true,
+            "org_id": "0",
+            "user_id": "0",
+            "hide_tag": false,
+            "numerical_value": null
+          }
+        ],
+        "Attribute": [
+          {
+            "id": "10001",
+            "event_id": "1001",
+            "object_id": "0",
+            "object_relation": null,
+            "category": "External analysis",
+            "type": "vulnerability",
+            "value1": "CVE-2024-38472",
+            "value2": "",
+            "to_ids": false,
+            "uuid": "attr-uuid-10001",
+            "timestamp": "1720789200",
+            "distribution": "5",
+            "sharing_group_id": "0",
+            "comment": "Critical RCE in Apache HTTP Server 2.4.0-2.4.57. Actively exploited in the wild.",
+            "deleted": false,
+            "disable_correlation": false,
+            "first_seen": null,
+            "last_seen": null,
+            "Galaxy": [],
+            "Tag": [
+              {
+                "id": "201",
+                "name": "cvss:9.8",
+                "colour": "#FF0000",
+                "exportable": true
+              }
+            ]
+          },
+          {
+            "id": "10002",
+            "event_id": "1001",
+            "object_id": "0",
+            "object_relation": null,
+            "category": "External analysis",
+            "type": "link",
+            "value1": "https://nvd.nist.gov/vuln/detail/CVE-2024-38472",
+            "value2": "",
+            "to_ids": false,
+            "uuid": "attr-uuid-10002",
+            "timestamp": "1720789200",
+            "distribution": "5",
+            "sharing_group_id": "0",
+            "comment": "NVD reference",
+            "deleted": false,
+            "disable_correlation": false
+          },
+          {
+            "id": "10003",
+            "event_id": "1001",
+            "object_id": "0",
+            "object_relation": null,
+            "category": "Targeting data",
+            "type": "text",
+            "value1": "Actively exploited against manufacturing and critical infrastructure targets in EU and APAC regions",
+            "value2": "",
+            "to_ids": false,
+            "uuid": "attr-uuid-10003",
+            "timestamp": "1720789200",
+            "distribution": "5",
+            "sharing_group_id": "0",
+            "comment": "Targeting context",
+            "deleted": false,
+            "disable_correlation": false
+          }
+        ],
+        "Object": [],
+        "Galaxy": [
+          {
+            "id": "301",
+            "uuid": "galaxy-uuid-301",
+            "name": "Threat Actor",
+            "type": "threat-actor",
+            "description": "Threat Actor Galaxy",
+            "GalaxyCluster": [
+              {
+                "id": "401",
+                "uuid": "cluster-uuid-401",
+                "type": "threat-actor",
+                "value": "APT41",
+                "tag_name": "misp-galaxy:threat-actor=\"APT41\"",
+                "description": "Chinese state-sponsored threat actor targeting manufacturing and semiconductor sectors",
+                "source": "MISP Project",
+                "authors": ["CIRCL", "NCSC-NL"],
+                "version": "1.0"
+              }
+            ]
+          }
+        ],
+        "Sighting": [
+          {
+            "id": "501",
+            "attribute_id": "10001",
+            "event_id": "1001",
+            "org_id": "2",
+            "date_sighting": "1720700000",
+            "uuid": "sighting-uuid-501",
+            "source": "",
+            "type": "0",
+            "Organisation": {
+              "id": "2",
+              "name": "NCSC-NL",
+              "uuid": "ncsc-nl-org-uuid"
+            }
+          },
+          {
+            "id": "502",
+            "attribute_id": "10001",
+            "event_id": "1001",
+            "org_id": "3",
+            "date_sighting": "1720750000",
+            "uuid": "sighting-uuid-502",
+            "source": "",
+            "type": "0",
+            "Organisation": {
+              "id": "3",
+              "name": "BSI",
+              "uuid": "bsi-org-uuid"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

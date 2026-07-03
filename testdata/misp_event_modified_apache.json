@@ -1,0 +1,94 @@
+{
+  "note": "Same UUID as event 1001 but MODIFIED — exploit:in-the-wild tag added AFTER initial publication. Should re-trigger scoring.",
+  "response": [
+    {
+      "Event": {
+        "id": "1001",
+        "orgc_id": "1",
+        "org_id": "1",
+        "date": "2024-07-12",
+        "threat_level_id": "1",
+        "info": "CVE-2024-38472 — Apache HTTP Server Vulnerability (ACTIVE EXPLOITATION) — UPDATED",
+        "published": true,
+        "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "attribute_count": "3",
+        "analysis": "2",
+        "timestamp": "1720875601",
+        "distribution": "3",
+        "sharing_group_id": "0",
+        "publish_timestamp": "1720789200",
+        "Org": {
+          "id": "1",
+          "name": "CIRCL",
+          "uuid": "circl-org-uuid-0001"
+        },
+        "Orgc": {
+          "id": "1",
+          "name": "CIRCL",
+          "uuid": "circl-org-uuid-0001"
+        },
+        "Tag": [
+          {
+            "id": "101",
+            "name": "tlp:amber",
+            "colour": "#FFA500",
+            "exportable": true
+          },
+          {
+            "id": "102",
+            "name": "exploit:in-the-wild",
+            "colour": "#FF0000",
+            "exportable": true
+          },
+          {
+            "id": "113",
+            "name": "exploit:weaponized",
+            "colour": "#FF6600",
+            "exportable": true
+          },
+          {
+            "id": "114",
+            "name": "workflow:state=\"complete\"",
+            "colour": "#008000",
+            "exportable": true
+          }
+        ],
+        "Attribute": [
+          {
+            "id": "10001",
+            "event_id": "1001",
+            "category": "External analysis",
+            "type": "vulnerability",
+            "value1": "CVE-2024-38472",
+            "value2": "",
+            "to_ids": false,
+            "uuid": "attr-uuid-10001",
+            "timestamp": "1720875601",
+            "distribution": "5",
+            "comment": "Critical RCE in Apache HTTP Server 2.4.0-2.4.57. NOW CONFIRMED WEAPONIZED with public PoC.",
+            "deleted": false,
+            "Tag": [{ "id": "201", "name": "cvss:9.8", "colour": "#FF0000", "exportable": true }]
+          }
+        ],
+        "Object": [],
+        "Galaxy": [],
+        "Sighting": [
+          {
+            "id": "503",
+            "attribute_id": "10001",
+            "event_id": "1001",
+            "org_id": "7",
+            "date_sighting": "1720850000",
+            "uuid": "sighting-uuid-503",
+            "type": "0",
+            "Organisation": {
+              "id": "7",
+              "name": "ANSSI",
+              "uuid": "anssi-org-uuid"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

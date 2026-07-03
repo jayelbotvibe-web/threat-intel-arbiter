@@ -1,0 +1,31 @@
+{
+  "note": "This event was published and then DELETED (hoax/retracted). The MISP Poller should detect deletion and suppress any existing alerts.",
+  "response": [
+    {
+      "Event": {
+        "id": "1006",
+        "orgc_id": "1",
+        "org_id": "1",
+        "date": "2024-07-01",
+        "threat_level_id": "4",
+        "info": "HOAX — Fabricated Cisco IOS XE Zero-Day (DELETED)",
+        "published": false,
+        "uuid": "f6a7b8c9-d0e1-2345-fabc-456789012345",
+        "attribute_count": "1",
+        "analysis": "0",
+        "timestamp": "1721048400",
+        "distribution": "0",
+        "Org": { "id": "1", "name": "CIRCL", "uuid": "circl-org-uuid-0001" },
+        "Orgc": { "id": "1", "name": "CIRCL", "uuid": "circl-org-uuid-0001" },
+        "Tag": [
+          { "id": "115", "name": "tlp:white", "colour": "#FFFFFF", "exportable": true },
+          { "id": "116", "name": "type:OSINT", "colour": "#808080", "exportable": true }
+        ],
+        "Attribute": [],
+        "Object": [],
+        "Galaxy": [],
+        "Sighting": []
+      }
+    }
+  ]
+}

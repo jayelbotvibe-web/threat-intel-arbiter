@@ -1,0 +1,87 @@
+{
+  "note": "This event targets SAP NetWeaver which IS in the semiconductor tech stack (critical ERP). Both CVEMatcher + SectorMatcher should fire.",
+  "response": [
+    {
+      "Event": {
+        "id": "1004",
+        "orgc_id": "1",
+        "org_id": "1",
+        "date": "2024-07-14",
+        "threat_level_id": "1",
+        "info": "CVE-2024-31245 — SAP NetWeaver Critical Vulnerability",
+        "published": true,
+        "uuid": "d4e5f6a7-b8c9-0123-defa-234567890123",
+        "attribute_count": "2",
+        "analysis": "2",
+        "timestamp": "1720962000",
+        "distribution": "3",
+        "sharing_group_id": "0",
+        "Org": {
+          "id": "6",
+          "name": "BSI",
+          "uuid": "bsi-org-uuid"
+        },
+        "Orgc": {
+          "id": "6",
+          "name": "BSI",
+          "uuid": "bsi-org-uuid"
+        },
+        "Tag": [
+          {
+            "id": "110",
+            "name": "tlp:amber",
+            "colour": "#FFA500",
+            "exportable": true
+          },
+          {
+            "id": "111",
+            "name": "eu-nis-oes:eu-nis-oes-manufacturing",
+            "colour": "#0000FF",
+            "exportable": true
+          }
+        ],
+        "Attribute": [
+          {
+            "id": "10008",
+            "event_id": "1004",
+            "category": "External analysis",
+            "type": "vulnerability",
+            "value1": "CVE-2024-31245",
+            "value2": "",
+            "to_ids": false,
+            "uuid": "attr-uuid-10008",
+            "timestamp": "1720962000",
+            "distribution": "5",
+            "comment": "Authentication bypass in SAP NetWeaver 7.5 SPS00-SPS21",
+            "deleted": false,
+            "Tag": [
+              {
+                "id": "203",
+                "name": "cvss:9.6",
+                "colour": "#FF0000",
+                "exportable": true
+              }
+            ]
+          },
+          {
+            "id": "10009",
+            "event_id": "1004",
+            "category": "External analysis",
+            "type": "link",
+            "value1": "https://nvd.nist.gov/vuln/detail/CVE-2024-31245",
+            "value2": "",
+            "to_ids": false,
+            "uuid": "attr-uuid-10009",
+            "timestamp": "1720962000",
+            "distribution": "5",
+            "comment": "NVD reference",
+            "deleted": false
+          }
+        ],
+        "Object": [],
+        "Galaxy": [],
+        "Sighting": []
+      }
+    }
+  ]
+}

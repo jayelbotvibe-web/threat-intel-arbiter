@@ -1,0 +1,130 @@
+=== RUN   TestFullPipeline_ConsoleOutput
+    router_test.go:78: 
+        
+    router_test.go:79: ═══════════════════════════════════════════════════════════════
+    router_test.go:80:   THREATLIB END-TO-END PIPELINE TEST
+    router_test.go:81:   NanoFab Semiconductor Inc. — 31 apps tracked
+    router_test.go:82: ═══════════════════════════════════════════════════════════════
+    router_test.go:83: 
+        
+    router_test.go:87: ── Processing: Apache CVE + KEV + exploit + sector ──
+2026/06/30 23:57:56 match: CVEMatcher produced 2 matches for event a1b2c3d4-e5f6-7890-abcd-ef1234567890
+2026/06/30 23:57:56 match: SectorMatcher produced 1 matches for event a1b2c3d4-e5f6-7890-abcd-ef1234567890
+2026/06/30 23:57:56 match: KEVMatcher produced 1 matches for event a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+[1;31m══════════════════════════════════════════════════════════[0m
+[1;31m  ▸▸▸ CRITICAL ALERT · HIGH · console▸▸▸[0m
+[1;31m══════════════════════════════════════════════════════════[0m
+
+CRITICAL (confidence: HIGH)
+
+CVE-2024-38472 — Apache HTTP Server Vulnerability (ACTIVE EXPLOITATION)
+
+Likelihood: 5/5
+  • Active exploitation confirmed by CISA KEV (+3)
+  • Active exploitation tag (+3)
+  • Threat actor activity: APT41 (+1)
+  • Recent publication (+1)
+
+Impact: 5/5
+  • CVSS 9.8 (+3)
+
+Exposure: 2/3
+  • Apache HTTP Server is internet-facing (+2)
+
+Confidence: 3/4 (HIGH)
+  • Source confidence: medium
+
+Score: (5 × 5 × 2) / (5 × 5 × 3) = 0.67 → CRITICAL
+
+Matched applications: Windows Server, Apache HTTP Server
+
+[1;31m──────────────────────────────────────────────────────────────[0m
+Alert ID: 13e16f2a394e8d3e · Event: a1b2c3d4-e5f6-7890-abcd-ef1234567890 · Time: 2026-06-30T23:57:56+08:00
+[1;31m──────────────────────────────────────────────────────────────[0m
+
+    router_test.go:101:   Result: critical · HIGH · routed to [console alerts-file] · 4 matches
+    router_test.go:87: ── Processing: Windows Server KEV CVE ──
+2026/06/30 23:57:56 match: CVEMatcher produced 2 matches for event b2c3d4e5-f6a7-8901-bcde-f12345678901
+2026/06/30 23:57:56 match: KEVMatcher produced 1 matches for event b2c3d4e5-f6a7-8901-bcde-f12345678901
+
+[1;31m══════════════════════════════════════════════════════════[0m
+[1;31m  ▸▸▸ CRITICAL ALERT · LOW · console▸▸▸[0m
+[1;31m══════════════════════════════════════════════════════════[0m
+
+CRITICAL (confidence: LOW)
+
+CVE-2024-28941 — Windows Server 2022 RCE (CISA KEV)
+
+Likelihood: 4/5
+  • Active exploitation confirmed by CISA KEV (+3)
+  • Active exploitation tag (+3)
+  • Recent publication (+1)
+
+Impact: 5/5
+  • CVSS 9.1 (+3)
+
+Exposure: 2/3
+  • Apache HTTP Server is internet-facing (+2)
+
+Confidence: 1/4 (LOW)
+  • Source confidence: low
+
+Score: (4 × 5 × 2) / (5 × 5 × 3) = 0.53 → CRITICAL
+
+Matched applications: Windows Server, Apache HTTP Server
+
+[1;31m──────────────────────────────────────────────────────────────[0m
+Alert ID: 18e7d3ff7cb52053 · Event: b2c3d4e5-f6a7-8901-bcde-f12345678901 · Time: 2026-06-30T23:57:56+08:00
+[1;31m──────────────────────────────────────────────────────────────[0m
+
+    router_test.go:101:   Result: critical · LOW · routed to [console] · 3 matches
+    router_test.go:87: ── Processing: SAP NetWeaver CVE + sector tag ──
+2026/06/30 23:57:56 match: CVEMatcher produced 1 matches for event d4e5f6a7-b8c9-0123-defa-234567890123
+2026/06/30 23:57:56 match: SectorMatcher produced 1 matches for event d4e5f6a7-b8c9-0123-defa-234567890123
+    router_test.go:101:   Result: low · HIGH · routed to [] · 2 matches
+    router_test.go:87: ── Processing: APT41 campaign — sector only, no CVE ──
+2026/06/30 23:57:56 match: SectorMatcher produced 1 matches for event c3d4e5f6-a7b8-9012-cdef-123456789012
+    router_test.go:101:   Result: low · HIGH · routed to [] · 1 matches
+    router_test.go:87: ── Processing: WordPress — should not match our stack ──
+    router_test.go:101:   Result: low · LOW · routed to [] · 0 matches
+    router_test.go:87: ── Processing: Apache CVE — MODIFIED with weaponized tag ──
+2026/06/30 23:57:56 match: CVEMatcher produced 2 matches for event a1b2c3d4-e5f6-7890-abcd-ef1234567890
+2026/06/30 23:57:56 match: KEVMatcher produced 1 matches for event a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+[1;31m══════════════════════════════════════════════════════════[0m
+[1;31m  ▸▸▸ CRITICAL ALERT · HIGH · console▸▸▸[0m
+[1;31m══════════════════════════════════════════════════════════[0m
+
+CRITICAL (confidence: HIGH)
+
+CVE-2024-38472 — Apache HTTP Server Vulnerability (ACTIVE EXPLOITATION) — UPDATED
+
+Likelihood: 5/5
+  • Active exploitation confirmed by CISA KEV (+3)
+  • Active exploitation tag (+3)
+  • Weaponization confirmed (+2)
+  • Recent publication (+1)
+
+Impact: 5/5
+  • CVSS 9.8 (+3)
+
+Exposure: 2/3
+  • Apache HTTP Server is internet-facing (+2)
+
+Confidence: 3/4 (HIGH)
+  • Source confidence: medium
+
+Score: (5 × 5 × 2) / (5 × 5 × 3) = 0.67 → CRITICAL
+
+Matched applications: Windows Server, Apache HTTP Server
+
+[1;31m──────────────────────────────────────────────────────────────[0m
+Alert ID: 14db22f97de9b73c · Event: a1b2c3d4-e5f6-7890-abcd-ef1234567890 · Time: 2026-06-30T23:57:56+08:00
+[1;31m──────────────────────────────────────────────────────────────[0m
+
+    router_test.go:101:   Result: critical · HIGH · routed to [console alerts-file] · 3 matches
+    router_test.go:105: 
+        ═══ Pipeline complete ═══
+--- PASS: TestFullPipeline_ConsoleOutput (0.00s)
+PASS

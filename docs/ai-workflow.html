@@ -1,0 +1,56 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>AI Workflow Architecture</title><style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#0d1117;color:#c9d1d9;font:14px Inter,system-ui,sans-serif;padding:40px;display:flex;justify-content:center}
+.diagram{max-width:900px;width:100%}h1{font-size:20px;color:#58a6ff;margin-bottom:24px;text-align:center}
+.lane{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;margin-bottom:16px}
+.lane-title{font-size:12px;text-transform:uppercase;color:#8b949e;margin-bottom:10px;letter-spacing:1px}
+.box{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center}
+.node{border:1px solid #30363d;border-radius:6px;padding:10px 14px;font-size:12px;text-align:center}
+.node.you{background:#0d419d22;border-color:#1f6feb} .node.cursor{background:#3fb95022;border-color:#3fb950}
+.node.hermes{background:#d2991d22;border-color:#d2991d} .node.arbiter{background:#f8514922;border-color:#f85149}
+.node.misp{background:#a371f722;border-color:#a371f7} .node .icon{font-size:20px;display:block;margin-bottom:4px}
+.node .label{font-weight:600}.node .role{color:#8b949e;font-size:10px}.arrow{text-align:center;color:#8b949e;font-size:18px;padding:4px 0}
+.dotted{border-style:dashed}</style></head><body>
+<div class="diagram">
+<h1>Threat Intel Arbiter — AI Workflow</h1>
+<div class="lane"><div class="lane-title">You — The CISO / Architect</div>
+<div class="box">
+<div class="node you"><span class="icon">🧠</span><span class="label">Niel</span><span class="role">Cyber Pro</span></div>
+<div style="color:#8b949e;margin:0 8px">→</div>
+<div class="node you"><span class="label">Defines WHAT</span><span class="role">Features • Alerts • Rules</span></div>
+</div></div>
+<div class="arrow">↓ you ask ↓</div>
+<div class="lane"><div class="lane-title">AI Layer — Two Tools, One Job</div>
+<div class="box">
+<div class="node cursor"><span class="icon">⌨️</span><span class="label">Cursor AI</span><span class="role">Inline Code • Autocomplete</span></div>
+<div style="color:#8b949e;margin:0 4px">+</div>
+<div class="node hermes"><span class="icon">🐍</span><span class="label">Hermes Agent</span><span class="role">Architecture • System Ops</span></div>
+</div>
+<div style="font-size:11px;color:#8b949e;text-align:center;margin-top:8px">.cursorrules bridges both — same brain, different hands</div></div>
+<div class="arrow">↓ builds ↓</div>
+<div class="lane"><div class="lane-title">Threat Intel Arbiter — Single Go Binary</div>
+<div class="box">
+<div class="node arbiter"><span class="icon">⚡</span><span class="label">Arbiter</span><span class="role">Engine • :8080</span></div>
+<div style="color:#8b949e">→</div>
+<div class="node arbiter">4-Dimension Scoring<span class="role">SSVC • SSVC Actions</span></div>
+<div style="color:#8b949e">→</div>
+<div class="node arbiter">Alert Router<span class="role">Slack • Teams • Email</span></div>
+</div></div>
+<div class="arrow">↓ feeds from ↓</div>
+<div class="lane"><div class="lane-title">Threat Sources</div>
+<div class="box">
+<div class="node misp"><span class="icon">🔍</span><span class="label">MISP 2.4</span><span class="role">172.16.146.129</span></div>
+<div style="color:#8b949e">+</div>
+<div class="node misp"><span class="icon">🇺🇸</span><span class="label">CISA KEV</span><span class="role">Authoritative</span></div>
+</div></div>
+<div class="lane"><div class="lane-title">Workflow Pattern</div>
+<div class="box" style="gap:4px;font-size:11px">
+<div class="node cursor" style="padding:6px 10px"><span class="label">1. You describe feature</span></div>
+<div style="color:#8b949e">→</div>
+<div class="node cursor" style="padding:6px 10px"><span class="label">2. Cursor writes code</span></div>
+<div style="color:#8b949e">→</div>
+<div class="node you" style="padding:6px 10px"><span class="label">3. You review diff</span></div>
+<div style="color:#8b949e">→</div>
+<div class="node hermes" style="padding:6px 10px"><span class="label">4. Hermes tests + deploys</span></div>
+<div style="color:#8b949e">→</div>
+<div class="node arbiter" style="padding:6px 10px"><span class="label">5. Arbiter runs live</span></div>
+</div></div></div></body></html>
