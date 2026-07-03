@@ -275,7 +275,7 @@ MIT — see [LICENSE](LICENSE) for full text.
 
 ---
 
-Built by [Juniel](https://www.linkedin.com/in/junielkatarn/) — [@jayelbotvibe](https://github.com/jayelbotvibe-web)
+Built by [@jayelbotvibe](https://github.com/jayelbotvibe-web)
 
 ⭐ **Star this repo** if it's useful. [Open an issue](https://github.com/jayelbotvibe-web/threat-intel-arbiter/issues) for bugs or feature requests.
 
