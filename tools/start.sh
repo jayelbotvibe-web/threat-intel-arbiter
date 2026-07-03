@@ -2,13 +2,21 @@
 # Threat Intel Arbiter — Startup Script
 # Starts the MISP VM (VMware) and the arbiter binary.
 # Safe to run multiple times — idempotent.
+#
+# Prerequisites: vmrun (VMware), sshpass, Go 1.25+
+# Set these env vars or edit the defaults below:
+#   MISP_IP         — your MISP VM IP address
+#   MISP_API_KEY    — your MISP API key
+#   ARBITER_DIR     — path to threat-intel-arbiter checkout
+#   VM_PATH         — path to MISP .vmx file
 
 set -e
 
-ARBITER_DIR="/home/niel/projects/threat-intel-arbiter"
-VM_PATH="/home/niel/vmware/misp-vm/misp.vmx"
-MISP_IP="172.16.146.129"
-MISP_KEY="CGRy4XpFiJj66UCjb0rIFGAuROJ06BIieBlSnHko"
+ARBITER_DIR="${ARBITER_DIR:-$HOME/threat-intel-arbiter}"
+VM_PATH="${VM_PATH:-$HOME/vmware/misp-vm/misp.vmx}"
+MISP_IP="${MISP_IP:-192.168.1.100}"
+: "${MISP_API_KEY:?Set MISP_API_KEY environment variable}"
+: "${ARBITER_ADMIN_KEY:?Set ARBITER_ADMIN_KEY environment variable}"
 
 echo "══════════════════════════════════════════"
 echo "  Threat Intel Arbiter — System Startup"
@@ -61,10 +69,8 @@ pkill -f "./arbiter" 2>/dev/null && echo "  Stopped old arbiter" && sleep 1 || t
 [ -x arbiter ] || go build -o arbiter ./cmd/arbiter/
 
 # Start
-export MISP_API_KEY="${MISP_API_KEY:-$MISP_KEY}"
-export ARBITER_ADMIN_KEY="${ARBITER_ADMIN_KEY:-demo}"
-
-nohup ./arbiter -key="$ARBITER_ADMIN_KEY" > /tmp/arbiter.log 2>&1 &
+export MISP_API_KEY
+nohup ./arbiter > /tmp/arbiter.log 2>&1 &
 sleep 2
 
 if pgrep -f "./arbiter" > /dev/null; then

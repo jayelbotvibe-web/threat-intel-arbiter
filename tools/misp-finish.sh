@@ -1,9 +1,11 @@
 #!/bin/bash
-# Wait for MISP install (proc_0469d9a03991), configure arbiter, shutdown
+# Wait for MISP install, configure arbiter, shutdown
+# Prerequisites: SSH access to MISP VM
+# Set MISP_IP env var or edit below
 set -e
 
-VM_IP="172.16.146.129"
-ARBITER_DIR="/home/niel/projects/threat-intel-arbiter"
+VM_IP="${MISP_IP:-192.168.1.100}"
+ARBITER_DIR="${ARBITER_DIR:-$HOME/threat-intel-arbiter}"
 LOG="/tmp/misp-finish.log"
 
 exec > "$LOG" 2>&1
