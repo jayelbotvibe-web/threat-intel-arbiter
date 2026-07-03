@@ -429,13 +429,15 @@ func parseRiskScore(explanation string) float64 {
 	return 0
 }
 
-// ssvcShort maps full SSVC action labels to short codes.
+// ssvcShort maps canonical SSVC v2.1 action labels to short codes.
 func ssvcShort(action string) string {
 	switch action {
-	case "Act Now":
+	case "Act":
 		return "act"
-	case "Schedule", "Attend":
+	case "Attend":
 		return "attend"
+	case "Track*":
+		return "trackstar"
 	default:
 		return "track"
 	}

@@ -24,14 +24,16 @@ const (
 
 // ScoreResult holds the output of the risk engine.
 type ScoreResult struct {
-	Likelihood     int     `json:"likelihood"`
-	Impact         int     `json:"impact"`
-	Exposure       int     `json:"exposure"`
-	Confidence     int     `json:"confidence"`
-	RiskScore      float64 `json:"risk_score"`
-	Severity       string  `json:"severity"`
-	ConfidenceLabel string `json:"confidence_label"`
-	Explanation    string  `json:"explanation"`
+	Likelihood      int     `json:"likelihood"`
+	Impact          int     `json:"impact"`
+	Exposure        int     `json:"exposure"`
+	Confidence      int     `json:"confidence"`
+	RiskScore       float64 `json:"risk_score"`
+	Severity        string  `json:"severity"`
+	ConfidenceLabel string  `json:"confidence_label"`
+	Action          string  `json:"action"`     // SSVC v2.1 decision: Act, Attend, Track*, Track
+	SSVCTrace       string  `json:"ssvc_trace"` // which tree branches fired
+	Explanation     string  `json:"explanation"`
 }
 
 // Engine computes risk scores for threat events.
@@ -62,6 +64,11 @@ func (e *Engine) Score(event model.ThreatEvent, org model.OrgContext, matches []
 
 	// Map to confidence label
 	result.ConfidenceLabel = confidenceLabel(result.Confidence)
+
+	// Run SSVC v2.1 decision tree for primary action output
+	ssvc := SSVCTree(event, org, matches)
+	result.Action = ssvc.Action
+	result.SSVCTrace = ssvc.Trace
 
 	// Generate explanation
 	result.Explanation = e.Explain(result, event, matches, org)
@@ -347,8 +354,9 @@ func (e *Engine) Explain(result ScoreResult, event model.ThreatEvent, matches []
 	}
 	b.WriteString("  • Default baseline (+1)\n")
 
-	// SSVC Action
-	b.WriteString(fmt.Sprintf("\nAction: %s", SSVCAction(result.Severity, result.ConfidenceLabel)))
+	// SSVC Action — show the decision tree trace
+	b.WriteString(fmt.Sprintf("\nAction: %s\n", result.Action))
+	b.WriteString(fmt.Sprintf("  • SSVC path: %s\n", result.SSVCTrace))
 
 	// Score
 	b.WriteString(fmt.Sprintf("\nScore: (%d × %d × %d) / (%d × %d × %d) = %.2f → %s",

@@ -33,7 +33,7 @@ func NewAlert(event model.ThreatEvent, result ScoreResult, matches []model.Match
 		EventID:     event.ID,
 		Severity:    result.Severity,
 		Confidence:  result.ConfidenceLabel,
-		Action:      SSVCAction(result.Severity, result.ConfidenceLabel),
+		Action:      result.Action,
 		Explanation: result.Explanation,
 		Status:      "new",
 		MatchedApps: apps,
@@ -41,22 +41,11 @@ func NewAlert(event model.ThreatEvent, result ScoreResult, matches []model.Match
 	}
 }
 
-// SSVCAction maps severity + confidence to an SSVC action directive.
-func SSVCAction(severity, confidence string) string {
-	switch {
-	case severity == "critical" && confidence == "HIGH":
-		return "Act Now"
-	case severity == "critical":
-		return "Schedule"
-	case severity == "high" && (confidence == "HIGH" || confidence == "MEDIUM"):
-		return "Schedule"
-	case severity == "high":
-		return "Track"
-	case severity == "medium":
-		return "Track"
-	default:
-		return "Monitor"
-	}
+// SSVCAction is the SSVC v2.1 decision tree. It replaces the pre-v2
+// score-to-label mapping. Calls SSVCTree internally and returns the
+// canonical action label (Act/Attend/Track*/Track).
+func SSVCAction(event model.ThreatEvent, org model.OrgContext, matches []model.Match) string {
+	return SSVCTree(event, org, matches).Action
 }
 
 // MarshalAlert serializes an alert to JSON.

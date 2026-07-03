@@ -229,3 +229,132 @@ func TestScoreEdges(t *testing.T) {
 		})
 	}
 }
+
+// ── SSVC v2.1 Decision Tree Tests ──
+
+func TestSSVC_KEV_Floored(t *testing.T) {
+	// Regression: KEV-listed CVE + lowest-criticality internal app
+	// must NOT score below Attend. The multiplicative formula would
+	// give this ~0.05 (low), but the SSVC tree guarantees Attend
+	// because exploitation=active + exposure=controlled → Attend.
+	engine := NewEngine()
+
+	event := model.ThreatEvent{
+		ID:    "CVE-2024-99999",
+		CVEs:  []string{"CVE-2024-99999"},
+		CVSS:  5.0,
+		Title: "KEV-listed vuln in LowPriApp",
+		SourceConfidence: "medium",
+	}
+	org := model.OrgContext{
+		TechStack: []model.App{{
+			Name: "LowPriApp", Criticality: "low",
+			InternetFacing: false, DataSensitivity: "low",
+		}},
+	}
+	matches := []model.Match{
+		{KEVMatch: true, AppName: "LowPriApp", Matcher: "KEVMatcher"},
+		{AppName: "LowPriApp", Matcher: "CVEMatcher"},
+	}
+
+	result := engine.Score(event, org, matches)
+
+	t.Logf("KEV floor: severity=%s action=%s score=%.2f trace=%s",
+		result.Severity, result.Action, result.RiskScore, result.SSVCTrace)
+
+	// The SSVC action must be Attend or higher — never Track for KEV
+	if result.Action != ActionAttend && result.Action != ActionAct {
+		t.Errorf("KEV CVE + internal app action = %s, want Attend or Act (SSVC floor)", result.Action)
+	}
+
+	// Score from multiplicative formula may be low — that's expected
+	t.Logf("multiplicative score = %.2f (expected low — SSVC tree overrides)", result.RiskScore)
+}
+
+func TestSSVC_MaxEverything(t *testing.T) {
+	// KEV + CVSS 9.8 + critical app + internet-facing → Act
+	engine := NewEngine()
+
+	event := model.ThreatEvent{
+		ID:               "CVE-2024-88888",
+		CVEs:             []string{"CVE-2024-88888"},
+		CVSS:             9.8,
+		Tags:             []string{"exploit:in-the-wild"},
+		ThreatActors:     []string{"APT41"},
+		SourceConfidence: "high",
+		Title:            "Critical RCE in CriticalApp",
+	}
+	org := model.OrgContext{
+		TechStack: []model.App{{
+			Name: "CriticalApp", Criticality: "critical",
+			InternetFacing: true, DataSensitivity: "critical",
+		}},
+	}
+	matches := []model.Match{
+		{KEVMatch: true, AppName: "CriticalApp", Matcher: "KEVMatcher"},
+		{AppName: "CriticalApp", Matcher: "CVEMatcher"},
+	}
+
+	result := engine.Score(event, org, matches)
+
+	t.Logf("max: severity=%s action=%s score=%.2f trace=%s",
+		result.Severity, result.Action, result.RiskScore, result.SSVCTrace)
+
+	if result.Action != ActionAct {
+		t.Errorf("max case action = %s, want Act", result.Action)
+	}
+	if result.Severity != "critical" {
+		t.Errorf("max case severity = %s, want critical", result.Severity)
+	}
+}
+
+func TestSSVC_NoExploitation(t *testing.T) {
+	// CVSS 5.5 + medium app + no KEV + no exploit tags → Track
+	engine := NewEngine()
+
+	event := model.ThreatEvent{
+		ID:               "CVE-2024-55555",
+		CVEs:             []string{"CVE-2024-55555"},
+		CVSS:             5.5,
+		SourceConfidence: "medium",
+		Title:            "Medium vuln in MedApp",
+	}
+	org := model.OrgContext{
+		TechStack: []model.App{{
+			Name: "MedApp", Criticality: "medium",
+			InternetFacing: false, DataSensitivity: "medium",
+		}},
+	}
+	matches := []model.Match{
+		{AppName: "MedApp", Matcher: "CVEMatcher"},
+	}
+
+	result := engine.Score(event, org, matches)
+
+	t.Logf("no-exploit: severity=%s action=%s score=%.2f trace=%s",
+		result.Severity, result.Action, result.RiskScore, result.SSVCTrace)
+
+	if result.Action != ActionTrack {
+		t.Errorf("no-exploit case action = %s, want Track", result.Action)
+	}
+}
+
+func TestSSVC_EmptyEvent(t *testing.T) {
+	// No data → Track (lowest priority)
+	engine := NewEngine()
+
+	event := model.ThreatEvent{
+		ID: "empty", SourceConfidence: "low",
+	}
+	org     := model.OrgContext{}
+	matches := []model.Match{}
+
+	result := engine.Score(event, org, matches)
+
+	t.Logf("empty: severity=%s action=%s trace=%s",
+		result.Severity, result.Action, result.SSVCTrace)
+
+	if result.Action != ActionTrack {
+		t.Errorf("empty event action = %s, want Track", result.Action)
+	}
+}

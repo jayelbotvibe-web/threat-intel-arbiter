@@ -1,6 +1,6 @@
 # Threat Intel Arbiter
 
-**Org-context-aware threat prioritization with SSVC actions and ATT&CK tagging.**
+**Org-context-aware threat prioritization with SSVC v2.1 decision-tree triage and ATT&CK tagging.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
@@ -26,7 +26,7 @@ Every alert includes: **Severity** + **Confidence** + **Action** + **Explanation
 
 - ✅ **Threat prioritization engine** — scores threats against your tech stack, sector, and exposure
 - ✅ **Multi-source** — MISP + CISA KEV today, NVD + GitHub Advisory on roadmap
-- ✅ **SSVC triage** — action cards (Track / Act / Monitor / Snooze) with keyboard navigation
+- ✅ **SSVC v2.1 triage** — CMU/CISA decision tree (Act / Attend / Track* / Track) with traceable branch paths
 - ✅ **ATT&CK tagging** — automatically maps threats to MITRE ATT&CK techniques
 - ✅ **EDR integration** — pushes IOCs to CrowdStrike Falcon in real-time
 - ✅ **Multi-user dashboard** — admin/reader roles, inline editing, CSV import from CMDB
