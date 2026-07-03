@@ -38,6 +38,7 @@ type CrowdstrikeNotifier struct {
 	expires      time.Time
 	refreshing   bool // single-flight guard for token refresh
 	sent         map[string]bool
+	pendingKeys  map[string]bool // in-flight IOC keys (not yet delivered)
 	client       *http.Client
 	pending      []csIndicator
 	flushCh      chan struct{}
@@ -49,18 +50,19 @@ type CrowdstrikeNotifier struct {
 func NewCrowdstrikeNotifier() *CrowdstrikeNotifier {
 	cid := os.Getenv("CROWDSTRIKE_CLIENT_ID")
 	cs := &CrowdstrikeNotifier{
-		BaseURL:    envOrDefault("CROWDSTRIKE_BASE_URL", "https://api.crowdstrike.com"),
-		ClientID:   cid,
-		Secret:     os.Getenv("CROWDSTRIKE_CLIENT_SECRET"),
-		Action:     envOrDefault("CROWDSTRIKE_ACTION", "detect"),
-		Severity:   envOrDefault("CROWDSTRIKE_SEVERITY", "medium"),
-		Expiration: 30,
-		Mock:       cid == "",
-		sent:       make(map[string]bool),
-		pending:    make([]csIndicator, 0, 100),
-		flushCh:    make(chan struct{}, 1),
-		closed:     make(chan struct{}),
-		client:     &http.Client{Timeout: 30 * time.Second},
+		BaseURL:     envOrDefault("CROWDSTRIKE_BASE_URL", "https://api.crowdstrike.com"),
+		ClientID:    cid,
+		Secret:      os.Getenv("CROWDSTRIKE_CLIENT_SECRET"),
+		Action:      envOrDefault("CROWDSTRIKE_ACTION", "detect"),
+		Severity:    envOrDefault("CROWDSTRIKE_SEVERITY", "medium"),
+		Expiration:  30,
+		Mock:        cid == "",
+		sent:        make(map[string]bool),
+		pendingKeys: make(map[string]bool),
+		pending:     make([]csIndicator, 0, 100),
+		flushCh:     make(chan struct{}, 1),
+		closed:      make(chan struct{}),
+		client:      &http.Client{Timeout: 30 * time.Second},
 	}
 	if exp := os.Getenv("CROWDSTRIKE_EXPIRATION"); exp != "" {
 		if n, err := fmt.Sscanf(exp, "%d", &cs.Expiration); err != nil || n != 1 {
@@ -98,17 +100,31 @@ func (c *CrowdstrikeNotifier) Close() {
 // flusher periodically sends batched IOCs.
 func (c *CrowdstrikeNotifier) flusher() {
 	ticker := time.NewTicker(30 * time.Second)
+	pruneTicker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
+	defer pruneTicker.Stop()
 	for {
 		select {
 		case <-c.closed:
 			return
+		case <-pruneTicker.C:
+			c.pruneSent()
 		case <-ticker.C:
 			c.flush()
 		case <-c.flushCh:
 			c.flush()
 		}
 	}
+}
+
+// pruneSent evicts old entries from the sent map to bound memory.
+func (c *CrowdstrikeNotifier) pruneSent() {
+	c.mu.Lock()
+	if len(c.sent) > 10000 {
+		c.sent = make(map[string]bool, 10000) // full reset; aggressive but safe
+		log.Printf("crowdstrike: pruned sent set (%d entries)", len(c.sent))
+	}
+	c.mu.Unlock()
 }
 
 // Notify sends IOCs from a threat event to Crowdstrike Falcon.
@@ -126,15 +142,7 @@ func (c *CrowdstrikeNotifier) Notify(event model.ThreatEvent, severity, confiden
 	csSev := mapToCSSeverity(severity)
 
 	for _, ioc := range event.IOCs {
-		key := string(ioc.Type) + ":" + ioc.Value
-		c.mu.Lock()
-		if c.sent[key] {
-			c.mu.Unlock()
-			continue
-		}
-		c.mu.Unlock()
-
-		// P0-2: Validate and clean the IOC value
+		// P0-2/0-3: Validate and clean the IOC value FIRST (before dedup)
 		clean := validateIOC(string(ioc.Type), ioc.Value)
 		if clean == "" {
 			log.Printf("crowdstrike: dropped invalid IOC %s=%q from %s", ioc.Type, ioc.Value, event.ID)
@@ -146,13 +154,29 @@ func (c *CrowdstrikeNotifier) Notify(event model.ThreatEvent, severity, confiden
 			continue
 		}
 		// P0-4: Check TLP export boundary
-		if blockedTLP(append(ioc.Tags, event.Tags...)) {
+		// P1-1: Build combined tags without aliasing ioc.Tags
+		combinedTLP := make([]string, 0, len(ioc.Tags)+len(event.Tags))
+		combinedTLP = append(combinedTLP, ioc.Tags...)
+		combinedTLP = append(combinedTLP, event.Tags...)
+		if blockedTLP(combinedTLP) {
 			log.Printf("crowdstrike: blocked TLP-restricted IOC %s=%s from %s", ioc.Type, ioc.Value, event.ID)
 			continue
 		}
+		// P0-2: Block well-known public infrastructure (resolvers, CDNs)
+		if neverBlockIPs[clean] || neverBlockDomains[clean] {
+			log.Printf("crowdstrike: blocked never-block indicator %s=%s from %s", ioc.Type, clean, event.ID)
+			continue
+		}
 
-		// Dedup key uses cleaned value
+		// P0-4: Dedup against cleaned value + in-flight check
 		dedupKey := string(ioc.Type) + ":" + clean
+		c.mu.Lock()
+		if c.sent[dedupKey] || c.pendingKeys[dedupKey] {
+			c.mu.Unlock()
+			continue
+		}
+		c.pendingKeys[dedupKey] = true // in-flight guard
+		c.mu.Unlock()
 
 		// Build description from the IOC's own comment, not the event title
 		desc := ioc.Description
@@ -188,11 +212,12 @@ func (c *CrowdstrikeNotifier) Notify(event model.ThreatEvent, severity, confiden
 
 		c.mu.Lock()
 		c.pending = append(c.pending, indicator)
+		n := len(c.pending)
 		c.mu.Unlock()
 		sent++
 
 		// Flush if batch is full
-		if len(c.pending) >= 100 {
+		if n >= 100 {
 			select {
 			case c.flushCh <- struct{}{}:
 			default:
@@ -229,10 +254,12 @@ func (c *CrowdstrikeNotifier) flush() {
 		}
 		c.mu.Unlock()
 	} else {
-		// Mark delivered IOCs as sent (dedup after confirmed 2xx)
+		// Mark delivered IOCs as sent and clear in-flight keys (dedup after confirmed 2xx)
 		c.mu.Lock()
 		for _, ind := range batch {
-			c.sent[ind.Type+":"+ind.Value] = true
+			key := ind.Type + ":" + ind.Value
+			c.sent[key] = true
+			delete(c.pendingKeys, key)
 		}
 		c.mu.Unlock()
 	}
@@ -436,6 +463,18 @@ func envOrDefault(key, def string) string {
 // ─── IOC validation, denylist, and TLP guards ───
 
 var (
+	// Well-known public resolvers and CDN IPs — never block these.
+	neverBlockIPs = map[string]bool{
+		"1.1.1.1": true, "1.0.0.1": true, // Cloudflare DNS
+		"8.8.8.8": true, "8.8.4.4": true, // Google DNS
+		"9.9.9.9": true, "149.112.112.112": true, // Quad9
+		"208.67.222.222": true, "208.67.220.220": true, // OpenDNS
+	}
+	neverBlockDomains = map[string]bool{
+		"google.com": true, "cloudflare.com": true, "akamai.net": true,
+		"fastly.net": true, "amazonaws.com": true, "azure.com": true,
+	}
+
 	// RFC1918, loopback, link-local, CGNAT, multicast — never send to EDR.
 	privateNets = []string{
 		"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", // RFC1918
@@ -454,9 +493,17 @@ var (
 
 // validateIOC checks the IOC value and returns the cleaned value or empty string if invalid.
 func validateIOC(iocType string, value string) string {
-	v := strings.TrimSpace(strings.ToLower(defangRE.ReplaceAllString(value, ".")))
-	v = strings.ReplaceAll(v, "hxxp://", "")
-	v = strings.ReplaceAll(v, "hxxps://", "")
+	// Strip URL schemes first, then defang bracket-notation
+	v := strings.TrimSpace(strings.ToLower(value))
+	v = strings.TrimPrefix(v, "http://")
+	v = strings.TrimPrefix(v, "https://")
+	v = strings.TrimPrefix(v, "hxxp://")
+	v = strings.TrimPrefix(v, "hxxps://")
+	// Replace [.] and (dot) with literal dot
+	v = strings.ReplaceAll(v, "[.]", ".")
+	v = strings.ReplaceAll(v, "(dot)", ".")
+	// Trim any leading/trailing dots from defanging
+	v = strings.Trim(v, ".")
 
 	switch iocType {
 	case "ipv4", "ipv6":
@@ -493,15 +540,25 @@ func isHex(s string) bool {
 	return true
 }
 
+var compiledPrivateNets []*net.IPNet
+
+func init() {
+	for _, cidr := range privateNets {
+		_, n, err := net.ParseCIDR(cidr)
+		if err == nil && n != nil {
+			compiledPrivateNets = append(compiledPrivateNets, n)
+		}
+	}
+}
+
 // isPrivateIP returns true if the IP is in a private/reserved range.
 func isPrivateIP(ip string) bool {
 	parsed := net.ParseIP(ip)
 	if parsed == nil {
 		return true // can't parse = reject
 	}
-	for _, cidr := range privateNets {
-		_, net, _ := net.ParseCIDR(cidr)
-		if net != nil && net.Contains(parsed) {
+	for _, n := range compiledPrivateNets {
+		if n.Contains(parsed) {
 			return true
 		}
 	}
