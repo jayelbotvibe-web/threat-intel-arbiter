@@ -51,9 +51,14 @@ func main() {
 	// Import tech stack
 	added, removed, err := db.ImportTechStack(apps)
 	if err != nil {
-		log.Fatalf("import tech stack: %v", err)
+		log.Printf("tech stack import: %v (continuing)", err)
 	}
-	log.Printf("tech stack loaded: %d apps (%d added, %d removed)", len(apps), added, removed)
+	if added+removed > 0 {
+		log.Printf("tech stack: %d added, %d removed", added, removed)
+	}
+
+	// Seed settings from environment (one-time, won't overwrite existing)
+	seedSettingsFromEnv(db)
 
 	// Build org context from config
 	orgCtx := cfg.Org.ToOrgContext(apps)
@@ -226,4 +231,25 @@ func main() {
 		csNotifier.Close()
 	}
 	log.Println("arbiter stopped")
+}
+
+// seedSettingsFromEnv populates the settings table from environment variables
+// on first run. Uses SeedSetting (no-op if already set) so existing values
+// are never overwritten.
+func seedSettingsFromEnv(db *store.DB) {
+	pairs := []struct{ key, env string }{
+		{store.SettingSlackWebhook, "SLACK_WEBHOOK_URL"},
+		{store.SettingTeamsWebhook, "TEAMS_WEBHOOK_URL"},
+		{store.SettingEmailTarget, "SMTP_TO"},
+		{store.SettingCSClientID, "CROWDSTRIKE_CLIENT_ID"},
+		{store.SettingCSSecret, "CROWDSTRIKE_CLIENT_SECRET"},
+		{store.SettingCSBaseURL, "CROWDSTRIKE_BASE_URL"},
+	}
+	for _, p := range pairs {
+		if v := os.Getenv(p.env); v != "" {
+			if err := db.SeedSetting(p.key, v); err != nil {
+				log.Printf("settings: seed %s: %v", p.key, err)
+			}
+		}
+	}
 }

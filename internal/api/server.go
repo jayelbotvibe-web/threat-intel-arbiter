@@ -107,6 +107,7 @@ func (s *Server) registerRoutes() {
 	s.Mux.HandleFunc("/api/alerts/", s.requireAuth(s.handleAlertDetail))
 	s.Mux.HandleFunc("/api/techstack", s.requireAuth(s.handleTechStack))
 	s.Mux.HandleFunc("/api/stats", s.requireAuth(s.handleStats))
+	s.Mux.HandleFunc("/api/settings", s.requireAuth(s.handleGetSettings))
 
 	// Admin write endpoints (admin role required — session or API key)
 	s.Mux.HandleFunc("/admin/import", s.requireAuth(s.requireAdmin(s.handleAdminImport)))
@@ -114,6 +115,7 @@ func (s *Server) registerRoutes() {
 	s.Mux.HandleFunc("/admin/pull", s.requireAuth(s.requireAdmin(s.handleAdminPull)))
 	s.Mux.HandleFunc("/admin/techstack", s.requireAuth(s.requireAdmin(s.handleAdminTechStack)))
 	s.Mux.HandleFunc("/admin/users", s.requireAuth(s.requireAdmin(s.handleAdminUsers)))
+	s.Mux.HandleFunc("/admin/settings", s.requireAuth(s.requireAdmin(s.handleAdminSettings)))
 }
 
 // serveDashboard returns the embedded dashboard HTML for authenticated users.
@@ -577,4 +579,63 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 // Delegates to the config package parser.
 func configParseTechStack(r io.Reader) ([]model.App, error) {
 	return config.ParseTechStackReader(r)
+}
+
+// handleGetSettings returns all settings with secret values masked.
+func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
+	settings, err := s.DB.GetAllSettingsMasked()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	// Always include the admin key status
+	if _, ok := settings["admin_key_masked"]; !ok {
+		if settings == nil {
+			settings = make(map[string]string)
+		}
+		if s.AdminKey != "" {
+			settings["admin_key_masked"] = "****" + s.AdminKey[len(s.AdminKey)-4:]
+		} else {
+			settings["admin_key_masked"] = ""
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"settings": settings})
+}
+
+// handleAdminSettings persists settings from the dashboard.
+func (s *Server) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "PUT required"})
+		return
+	}
+	var body map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+		return
+	}
+	// Whitelist: only persist known setting keys
+	allowed := map[string]bool{
+		store.SettingSlackWebhook: true,
+		store.SettingTeamsWebhook: true,
+		store.SettingEmailTarget:  true,
+		store.SettingCSClientID:   true,
+		store.SettingCSSecret:     true,
+		store.SettingCSBaseURL:    true,
+	}
+	saved := 0
+	for k, v := range body {
+		if !allowed[k] {
+			continue
+		}
+		if err := s.DB.SetSetting(k, v); err != nil {
+			log.Printf("settings: save %s: %v", k, err)
+			continue
+		}
+		saved++
+	}
+	log.Printf("settings: saved %d values", saved)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status": "ok", "saved": saved,
+		"note": "Restart required for notifier changes to take effect",
+	})
 }

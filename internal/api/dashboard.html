@@ -284,22 +284,23 @@
     </div>
     <div id="settings-apikey" style="display:none">
       <h4 style="margin-bottom:8px">API Key</h4>
-      <input style="width:100%;margin-bottom:10px" type="password" id="apiKeyInput" placeholder="Admin API key…" onchange="saveAPIKey()">
+      <input style="width:100%;margin-bottom:10px" type="text" id="apiKeyInput" readonly placeholder="Set via ARBITER_ADMIN_KEY env var">
       <h4 style="margin-bottom:8px">Webhooks</h4>
       <label style="display:block;font-size:11px;color:var(--faint)">Slack</label>
-      <input style="width:100%;margin-bottom:8px" id="slackUrl" placeholder="https://hooks.slack.com/…" onchange="saveWebhooks()">
+      <input style="width:100%;margin-bottom:8px" id="slackUrl" placeholder="https://hooks.slack.com/…">
       <label style="display:block;font-size:11px;color:var(--faint)">Teams</label>
-      <input style="width:100%;margin-bottom:8px" id="teamsUrl" placeholder="https://…" onchange="saveWebhooks()">
+      <input style="width:100%;margin-bottom:8px" id="teamsUrl" placeholder="https://…">
       <label style="display:block;font-size:11px;color:var(--faint)">Email</label>
-      <input style="width:100%" id="emailTarget" placeholder="soc@company.com" onchange="saveWebhooks()">
+      <input style="width:100%" id="emailTarget" placeholder="soc@company.com">
       <h4 style="margin-bottom:8px;margin-top:16px">EDR — Crowdstrike Falcon</h4>
-      <p style="font-size:10px;color:var(--faint);margin-bottom:6px">IOC integration — leave blank for mock mode</p>
       <label style="display:block;font-size:11px;color:var(--faint)">Client ID</label>
-      <input style="width:100%;margin-bottom:8px" id="csClientId" placeholder="Client ID…" onchange="saveWebhooks()">
+      <input style="width:100%;margin-bottom:8px" id="csClientId" placeholder="Client ID…">
       <label style="display:block;font-size:11px;color:var(--faint)">Client Secret</label>
-      <input style="width:100%;margin-bottom:8px" type="password" id="csSecret" placeholder="Client secret…" onchange="saveWebhooks()">
+      <input style="width:100%;margin-bottom:8px" type="password" id="csSecret" placeholder="Client secret…">
       <label style="display:block;font-size:11px;color:var(--faint)">Base URL</label>
-      <input style="width:100%" id="csBaseUrl" placeholder="https://api.crowdstrike.com" onchange="saveWebhooks()">
+      <input style="width:100%;margin-bottom:10px" id="csBaseUrl" placeholder="https://api.crowdstrike.com">
+      <button class="btn pri admin-only" onclick="saveSettings()" style="width:auto">Save Settings</button>
+      <span id="settingsNote" style="font-size:10px;color:var(--faint);margin-left:8px"></span>
     </div>
     <div id="settings-status" style="display:none">
       <div id="statusContent" style="font-size:12px;color:var(--dim)">Loading…</div>
@@ -322,10 +323,9 @@ function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;",
 // ── Data layer ──
 var ALL = [], currentUser = null, cursor = 0, openId = null;
 var filter = {action:"", sev:"", status:""};
-var AK = () => localStorage.getItem('arbiter_admin_key') || '';
 
 async function api(path, opts={}) {
-  const h = {'Content-Type':'application/json'}; if (AK()) h['X-Arbiter-Key'] = AK();
+  const h = {'Content-Type':'application/json'};
   const r = await fetch(path, {...opts, headers:{...h,...opts.headers}});
   return r.json();
 }
@@ -573,7 +573,7 @@ async function handleCSV(input) {
 // ── Settings ──
 function openSettings() {
   document.getElementById('settings-modal').classList.add('active');
-  loadUsers(); loadAPIWebhooks(); loadSystemStatus();
+  loadUsers(); loadSettings(); loadSystemStatus();
   document.querySelectorAll('#settings-modal .stab').forEach(function(s,i){ s.classList.toggle('active',i===0); });
   document.getElementById('settings-users').style.display='';
   document.getElementById('settings-apikey').style.display='none';
@@ -621,21 +621,59 @@ async function deleteUser(u) {
   else toast(r.error||'Error');
 }
 
-// ── API & Webhooks ──
-function saveAPIKey(){ var k=document.getElementById('apiKeyInput').value; if(k)localStorage.setItem('arbiter_admin_key',k); }
-function saveWebhooks() { localStorage.setItem('arbiter_slack',document.getElementById('slackUrl').value);
-  localStorage.setItem('arbiter_teams',document.getElementById('teamsUrl').value);
-  localStorage.setItem('arbiter_email',document.getElementById('emailTarget').value);
-  localStorage.setItem('cs_client_id',document.getElementById('csClientId').value);
-  localStorage.setItem('cs_secret',document.getElementById('csSecret').value);
-  localStorage.setItem('cs_base_url',document.getElementById('csBaseUrl').value); }
-function loadAPIWebhooks() { document.getElementById('apiKeyInput').value=localStorage.getItem('arbiter_admin_key')||'';
-  document.getElementById('slackUrl').value=localStorage.getItem('arbiter_slack')||'';
-  document.getElementById('teamsUrl').value=localStorage.getItem('arbiter_teams')||'';
-  document.getElementById('emailTarget').value=localStorage.getItem('arbiter_email')||'';
-  document.getElementById('csClientId').value=localStorage.getItem('cs_client_id')||'';
-  document.getElementById('csSecret').value=localStorage.getItem('cs_secret')||'';
-  document.getElementById('csBaseUrl').value=localStorage.getItem('cs_base_url')||''; }
+// ── Settings (server-side, replaces localStorage) ──
+async function loadSettings() {
+  var d = await api('/api/settings'); if (!d||!d.settings) return;
+  var s = d.settings;
+  document.getElementById('apiKeyInput').value = s.admin_key_masked || 'Not configured';
+  document.getElementById('slackUrl').value = s.slack_webhook_url || '';
+  document.getElementById('teamsUrl').value = s.teams_webhook_url || '';
+  document.getElementById('emailTarget').value = s.email_target || '';
+  document.getElementById('csClientId').value = s.cs_client_id || '';
+  document.getElementById('csSecret').value = s.cs_secret || '';
+  document.getElementById('csBaseUrl').value = s.cs_base_url || 'https://api.crowdstrike.com';
+}
+async function saveSettings() {
+  var body = {
+    slack_webhook_url: document.getElementById('slackUrl').value,
+    teams_webhook_url: document.getElementById('teamsUrl').value,
+    email_target: document.getElementById('emailTarget').value,
+    cs_client_id: document.getElementById('csClientId').value,
+    cs_secret: document.getElementById('csSecret').value,
+    cs_base_url: document.getElementById('csBaseUrl').value,
+  };
+  var r = await adm('PUT', '/admin/settings', body);
+  if (r.status==='ok') {
+    var note = document.getElementById('settingsNote');
+    note.textContent = '✓ Saved — ' + (r.note||'restart required for notifier changes');
+    setTimeout(function(){ note.textContent=''; }, 5000);
+  } else {
+    toast(r.error||'Save failed');
+  }
+}
+
+// One-time migration from localStorage to server-side settings.
+// Runs on first load after upgrade; clears localStorage on success.
+async function migrateLocalStorage() {
+  if (!localStorage.getItem('arbiter_admin_key') && !localStorage.getItem('arbiter_slack')) return;
+  var body = {};
+  var v;
+  if (v=localStorage.getItem('arbiter_slack')) body.slack_webhook_url = v;
+  if (v=localStorage.getItem('arbiter_teams')) body.teams_webhook_url = v;
+  if (v=localStorage.getItem('arbiter_email')) body.email_target = v;
+  if (v=localStorage.getItem('cs_client_id')) body.cs_client_id = v;
+  if (v=localStorage.getItem('cs_secret')) body.cs_secret = v;
+  if (v=localStorage.getItem('cs_base_url')) body.cs_base_url = v;
+  if (Object.keys(body).length === 0) { localStorage.clear(); return; }
+  try {
+    var r = await adm('PUT', '/admin/settings', body);
+    if (r.status==='ok') {
+      localStorage.clear();
+      toast('Settings migrated to server — localStorage cleared');
+    }
+  } catch(e) {}
+}
+
 async function loadSystemStatus() {
   var h = await api('/api/status');
   document.getElementById('statusContent').innerHTML = '<div style="display:grid;gap:6px">'+
@@ -664,7 +702,7 @@ function toast(msg,ok) { var t=document.getElementById('toast'); t.textContent=m
   clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('on');},1900); }
 
 // ── Startup ──
-checkSession().then(function(){ loadAPIWebhooks(); refreshAll(); setInterval(refreshAll,30000); });
+checkSession().then(function(){ migrateLocalStorage(); loadSettings(); refreshAll(); setInterval(refreshAll,30000); });
 </script>
 </body>
 </html>
