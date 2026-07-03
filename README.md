@@ -6,13 +6,19 @@
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
 [![CI](https://github.com/jayelbotvibe-web/threat-intel-arbiter/actions/workflows/test.yml/badge.svg)](https://github.com/jayelbotvibe-web/threat-intel-arbiter/actions/workflows/test.yml)
 
-Single Go binary. One dependency (SQLite driver). Deploy in 60 seconds with Go 1.25+.
+Single Go binary. One runtime dependency: modernc.org/sqlite (pure Go SQLite driver). Deploy in 60 seconds with Go 1.25+.
+
+![Dashboard Screenshot](docs/dashboard-screenshot.jpg)
 
 Threat Intel Arbiter transforms raw threat intelligence from MISP and CISA KEV into organisation-specific, scored, and explained actions. It answers one question:
 
 > **Should this organisation care about this threat right now?**
 
 Every alert includes: **Severity** + **Confidence** + **Action** + **Explanation** with full risk score breakdown.
+
+> **💡 The real moat:** months of operational data produce a false-positive feedback loop whose calibration a competitor can't replicate without the same production history.
+
+**👥 Who it's for:** SOC analysts and one-person security teams drowning in MISP feeds — if you need signal instead of noise, prioritised alerts mapped to your actual tech stack.
 
 ---
 
@@ -32,6 +38,10 @@ Every alert includes: **Severity** + **Confidence** + **Action** + **Explanation
 - ❌ A vulnerability scanner — Nessus, Qualys, etc. do that
 - ❌ A SIEM or SOAR
 - ❌ A CMDB — it imports from one
+
+### Why not a SOAR / ThreatConnect / Nucleus?
+
+Those platforms are heavyweight — they require infrastructure, dedicated admins, and weeks of onboarding. Threat Intel Arbiter is a **single 16MB binary** that deploys in 60 seconds on any machine. If you already run MISP and need prioritised alerts without standing up another platform, this is the lightweight alternative. It doesn't replace your SIEM or ticketing — it feeds them.
 
 ---
 
@@ -149,7 +159,7 @@ Built-in single-page application — no framework, no build step, pure HTML/CSS/
 - Session cookie auth (HttpOnly, SameSite=Strict), 12-hour expiry
 - Password hashing: Argon2id with legacy SHA-256 upgrade on login
 - Session tokens: SHA-256 hashed at rest in SQLite
-- Default admin seeded on first start with random password (printed to stdout once)
+- Default admin account seeded on first start with a random one-time password (printed to stdout). You are **forced to change it on first login** — no standing default credentials exist.
 - Programmatic access via `X-Arbiter-Key` header (API key always has admin privileges)
 
 ---
@@ -280,3 +290,11 @@ All endpoints require authentication (session cookie or `X-Arbiter-Key`). `/heal
 ## License
 
 MIT — see [LICENSE](LICENSE) for full text.
+
+---
+
+Built by [Juniel](https://www.linkedin.com/in/junielkatarn/) — [@jayelbotvibe](https://github.com/jayelbotvibe-web)
+
+⭐ **Star this repo** if it's useful. [Open an issue](https://github.com/jayelbotvibe-web/threat-intel-arbiter/issues) for bugs or feature requests.
+
+**Roadmap:** NVD API + GitHub Advisory sources, Microsoft Defender / SentinelOne EDR connectors, multi-tenancy.
