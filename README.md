@@ -47,7 +47,9 @@ Those platforms are heavyweight — they require infrastructure, dedicated admin
 
 ## Architecture
 
-![Threat Intel Arbiter Architecture](docs/architecture-overview.jpg)
+[![Threat Intel Arbiter Architecture](docs/architecture-overview.jpg)](https://jayelbotvibe-web.github.io/threat-intel-arbiter/architecture.html)
+
+*[Click the diagram → interactive architecture page with detail drawers for every component]*
 
 Five-stage pipeline — ingestion, normalization, match & score, explanation, routing — all in a single Go binary.
 
@@ -185,7 +187,7 @@ go build -o arbiter ./cmd/arbiter/
 |---|---|
 | [System Design](docs/design.md) | Full architecture, scoring formula, database schema, positioning strategy |
 | [EDR — CrowdStrike Falcon](docs/edr-crowdstrike.md) | IOC extraction, OAuth2, batching, dedup, mock mode |
-| [Architecture Diagram](docs/architecture.html) | Interactive SVG of the full pipeline |
+| [Architecture Diagram](https://jayelbotvibe-web.github.io/threat-intel-arbiter/architecture.html) | Interactive 6-band pipeline — click any block for details |
 | [API Reference](#api) | Complete endpoint reference (below) |
 | [Security Policy](SECURITY.md) | Threat model, mitigations, vulnerability reporting |
 
