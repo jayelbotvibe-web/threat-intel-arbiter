@@ -16,7 +16,7 @@ Threat Intel Arbiter transforms raw threat intelligence from MISP and CISA KEV i
 
 Every alert includes: **Severity** + **Confidence** + **Action** + **Explanation** with full risk score breakdown.
 
-**👥 Who it's for:** SOC analysts and one-person security teams drowning in MISP feeds — if you need signal instead of noise, prioritised alerts mapped to your actual tech stack.
+**👥 Who it's for:** SOC teams that already run MISP but don't have a dedicated TIP or vulnerability prioritization layer. If you're drowning in MISP feeds and need CVE-to-techstack matching without standing up OpenCTI or Nucleus, this is for you. If you don't run MISP, this tool isn't useful yet — KEV-only mode is on the roadmap.
 
 ---
 
@@ -36,6 +36,7 @@ Every alert includes: **Severity** + **Confidence** + **Action** + **Explanation
 - ❌ A vulnerability scanner — Nessus, Qualys, etc. do that
 - ❌ A SIEM or SOAR
 - ❌ A CMDB — it imports from one
+- ❌ An IOC-based threat intel tool — prioritization is CVE-driven. IOCs (IPs, domains, hashes) are extracted for EDR push but are NOT used in matching or scoring. This is a CVE prioritization engine with MISP as transport.
 
 ### Why not a SOAR / ThreatConnect / Nucleus?
 
@@ -127,6 +128,8 @@ Built-in single-page application — no framework, no build step, pure HTML/CSS/
 | **Import CSV** | Drag-and-drop bulk upload from CMDB (ServiceNow, Ivanti, Snipe-IT, etc.). Delta detection shows what was added/removed. |
 | **Users** | Admin-only. Create/edit/delete user accounts with admin/reader roles. |
 | **Settings** | Configure admin API key, Slack/Teams/Email webhook URLs, CrowdStrike credentials. |
+
+> ⚠️ **Inventory staleness is the single biggest risk to prioritization accuracy.** A CVE-to-app match is only as good as your techstack.csv. If your inventory says you run Apache 2.4.41 but you patched to 2.4.62, every 2.4.x CVE alert becomes a false positive — confidently wrong priorities are worse than no tool. Apps not verified in 30+ days show a staleness warning in the dashboard. Automated inventory sync (scanner export, cloud API, agent) is on the roadmap.
 
 ### User Accounts
 

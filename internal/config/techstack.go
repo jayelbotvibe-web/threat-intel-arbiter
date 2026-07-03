@@ -12,7 +12,7 @@ import (
 )
 
 // ParseTechStack reads a CSV file and returns the application inventory.
-// Expected columns: name,version,vendor,category,criticality,owner_team,internet_facing,hosts,data_sensitivity
+// Expected columns: name,version,vendor,category,criticality,owner_team,internet_facing,hosts,data_sensitivity,last_verified
 func ParseTechStack(path string) ([]model.App, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -62,6 +62,7 @@ func ParseTechStackReader(r io.Reader) ([]model.App, error) {
 			InternetFacing:  getColBool(record, cols, "internet_facing"),
 			Hosts:           getCol(record, cols, "hosts"),
 			DataSensitivity: getCol(record, cols, "data_sensitivity"),
+			LastVerified:    getCol(record, cols, "last_verified"),
 		}
 
 		if app.Name == "" {
@@ -123,7 +124,9 @@ func appKey(app model.App) string {
 	return strings.ToLower(strings.TrimSpace(app.Vendor)) + ":" + strings.ToLower(strings.TrimSpace(app.Name))
 }
 
-// appChanged returns true if criticality, internet_facing, or data_sensitivity changed.
+// appChanged returns true if criticality, internet_facing, data_sensitivity,
+// or version changed. LastVerified is excluded — it's a freshness timestamp,
+// not a material inventory change.
 func appChanged(new, old model.App) bool {
 	return new.Criticality != old.Criticality ||
 		new.InternetFacing != old.InternetFacing ||

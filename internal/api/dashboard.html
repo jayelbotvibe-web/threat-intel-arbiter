@@ -252,8 +252,8 @@
       <div style="display:flex;gap:6px"><button class="btn pri" onclick="addApp()" style="width:auto;flex:none">Add</button><button class="btn" onclick="document.getElementById('addAppForm').style.display='none'" style="width:auto;flex:none">Cancel</button></div>
     </div>
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden">
-      <table class="tstable"><thead><tr><th>Application</th><th>Version</th><th>Criticality</th><th>Internet</th><th>Category</th><th></th></tr></thead>
-      <tbody id="techstackList"><tr><td colspan="6" style="text-align:center;padding:40px;color:var(--faint)">Loading…</td></tr></tbody></table>
+      <table class="tstable"><thead><tr><th>Application</th><th>Version</th><th>Criticality</th><th>Internet</th><th>Category</th><th>Freshness</th><th></th></tr></thead>
+      <tbody id="techstackList"><tr><td colspan="7" style="text-align:center;padding:40px;color:var(--faint)">Loading…</td></tr></tbody></table>
     </div>
   </div>
 </div>
@@ -530,8 +530,15 @@ async function loadTechStack() {
     return '<tr><td style="font-weight:600">'+esc(a.name)+'</td><td>'+esc(a.version||'—')+'</td>'+
       '<td>'+esc(a.criticality||'medium')+'</td><td>'+(a.internet_facing?'Internet':'Internal')+'</td>'+
       '<td>'+esc(a.category||'—')+'</td>'+
+      '<td>'+staleBadge(a)+'</td>'+
       '<td><button class="btn ghost admin-only" onclick="removeApp(\''+esc(a.name)+'\')" style="width:auto;flex:none;padding:2px 8px;font-size:13px">×</button></td></tr>';
   }).join('');
+}
+function staleBadge(a) {
+  if (!a.last_verified) return '<span style="color:var(--warn);font-size:11px" title="Never verified">⚠ never</span>';
+  var days = (Date.now() - new Date(a.last_verified).getTime()) / 86400000;
+  if (days > 30) return '<span style="color:var(--crit);font-size:11px" title="Last verified '+Math.round(days)+' days ago">⚠ stale</span>';
+  return '<span style="color:var(--green);font-size:11px" title="Verified '+Math.round(days)+' days ago">✓ recent</span>';
 }
 function showAddApp(){ document.getElementById('addAppForm').style.display='block'; }
 function showImport(){ document.getElementById('importSection').style.display='block'; }

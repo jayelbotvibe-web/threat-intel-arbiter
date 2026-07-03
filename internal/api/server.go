@@ -514,6 +514,7 @@ func (s *Server) handleTechStack(w http.ResponseWriter, r *http.Request) {
 		InternetFacing bool   `json:"internet_facing"`
 		Hosts          string `json:"hosts"`
 		DataSensitivity string `json:"data_sensitivity"`
+		LastVerified   string `json:"last_verified"`
 	}
 
 	var list []appSummary
@@ -528,6 +529,7 @@ func (s *Server) handleTechStack(w http.ResponseWriter, r *http.Request) {
 			InternetFacing:  a.InternetFacing,
 			Hosts:           a.Hosts,
 			DataSensitivity: a.DataSensitivity,
+			LastVerified:    a.LastVerified,
 		})
 	}
 

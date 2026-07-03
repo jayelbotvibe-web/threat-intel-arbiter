@@ -43,6 +43,7 @@ type App struct {
 	InternetFacing  bool   `json:"internet_facing"`
 	Hosts           string `json:"hosts"`
 	DataSensitivity string `json:"data_sensitivity"` // "critical", "high", "medium", "low"
+	LastVerified    string `json:"last_verified"`     // ISO 8601 timestamp; empty if never verified
 }
 
 // OrgContext holds the organisation's profile for matching and scoring.
