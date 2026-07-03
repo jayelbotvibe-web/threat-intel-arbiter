@@ -32,16 +32,17 @@ type CrowdstrikeNotifier struct {
 	Expiration int    // days until IOC expires
 	Mock       bool
 
-	mu         sync.Mutex // protects sent, pending, flushCh
-	tokenMu    sync.Mutex // protects token, expires, tokenRefreshing
-	token      string
-	expires    time.Time
-	refreshing bool // single-flight guard for token refresh
-	sent       map[string]bool
-	client     *http.Client
-	pending    []csIndicator
-	flushCh    chan struct{}
-	closed     chan struct{} // closed on shutdown for graceful drain
+	mu           sync.Mutex // protects sent, pending, flushCh
+	tokenMu      sync.Mutex // protects token, expires, tokenRefreshing
+	token        string
+	expires      time.Time
+	refreshing   bool // single-flight guard for token refresh
+	sent         map[string]bool
+	client       *http.Client
+	pending      []csIndicator
+	flushCh      chan struct{}
+	closed       chan struct{}   // closed on shutdown for graceful drain
+	preventTypes map[string]bool // types eligible for prevent (empty = all detect)
 }
 
 // NewCrowdstrikeNotifier creates a Crowdstrike notifier from environment variables.
@@ -68,6 +69,18 @@ func NewCrowdstrikeNotifier() *CrowdstrikeNotifier {
 	}
 	log.Printf("crowdstrike: action=%s severity=%s expiration=%dd mock=%v",
 		cs.Action, cs.Severity, cs.Expiration, cs.Mock)
+	// P0-1: Prevent requires explicit IOC type allowlist
+	if cs.Action == "prevent" {
+		cs.preventTypes = make(map[string]bool)
+		if types := os.Getenv("CROWDSTRIKE_PREVENT_IOC_TYPES"); types != "" {
+			for _, t := range strings.Split(types, ",") {
+				cs.preventTypes[strings.TrimSpace(t)] = true
+			}
+		}
+		if len(cs.preventTypes) == 0 {
+			log.Printf("crowdstrike: WARNING — action=prevent but CROWDSTRIKE_PREVENT_IOC_TYPES not set; all IOCs downgraded to detect")
+		}
+	}
 	if !cs.Mock {
 		go cs.flusher()
 	}
@@ -147,9 +160,15 @@ func (c *CrowdstrikeNotifier) Notify(event model.ThreatEvent, severity, confiden
 			desc = fmt.Sprintf("%s IOC from MISP event", ioc.Type)
 		}
 
+		action := c.Action
+		// P0-1: Only allow prevent for explicitly approved IOC types
+		if action == "prevent" && len(c.preventTypes) > 0 && !c.preventTypes[string(ioc.Type)] {
+			action = "detect"
+		}
+
 		indicator := csIndicator{
 			Source:      ioc.Source,
-			Action:      c.Action,
+			Action:      action,
 			Expiration:  expiration,
 			Type:        string(ioc.Type),
 			Value:       clean,
