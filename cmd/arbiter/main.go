@@ -222,5 +222,8 @@ func main() {
 	}
 
 	cancel()
+	if csNotifier != nil {
+		csNotifier.Close()
+	}
 	log.Println("arbiter stopped")
 }
