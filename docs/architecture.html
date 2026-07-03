@@ -120,6 +120,7 @@
   .sp.act{color:var(--crit);background:rgba(255,93,106,0.14)}
   .sp.attend{color:var(--high);background:rgba(255,157,66,0.14)}
   .sp.track{color:var(--low);background:rgba(123,135,152,0.14)}
+  .sp.trackstar{color:var(--high);background:rgba(255,157,66,0.10)}
 
   /* ── branch row (context feeds match) ── */
   .feed{display:grid;grid-template-columns:230px 40px 1fr;align-items:center;gap:0}
@@ -189,7 +190,7 @@
     <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" stroke="#fff" stroke-width="1.6" fill="rgba(255,255,255,0.12)"/><path d="M9 12l2 2 4-4.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     <div>
       <h1>Threat Intel Arbiter — Architecture</h1>
-      <div class="sub">Org-context-aware threat prioritization · <b>single Go binary</b> · SQLite · MISP + CISA KEV → SSVC actions → EDR response</div>
+      <div class="sub">Org-context-aware CVE prioritization · <b>single Go binary</b> · SQLite · MISP + CISA KEV → SSVC v2.1 triage → EDR response</div>
     </div>
     <span class="spacer"></span>
     <div class="hint">Click any block for <b>details</b></div>
@@ -293,7 +294,7 @@
     <!-- risk engine centerpiece -->
     <div class="node" style="--nc:var(--score);cursor:pointer" data-node="risk">
       <div class="nt"><span class="ico" style="--nc:var(--score)"><svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path d="M3 17l5-5 4 3 8-8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 4h4v4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h3>Risk engine</h3><span class="tag mono" style="margin-left:auto">internal/risk/engine.go</span></div>
-      <div class="desc">Scores each match across four dimensions, combines them into a normalized risk score, then maps to a severity band and an SSVC action — the verdict an analyst acts on.</div>
+      <div class="desc">Scores each match across four dimensions as a tiebreaker, then runs the SSVC v2.1 decision tree (Exploitation → Exposure → Automatable → Mission Impact) to produce the canonical action (Act/Attend/Track*/Track) — the verdict an analyst acts on.</div>
 
       <div class="scorebox">
         <div class="sh">Four dimensions → one verdict</div>
@@ -308,7 +309,7 @@
           <span class="arrow-r">→</span><span class="out">severity</span><span class="arrow-r">→</span><span class="out">SSVC action</span>
         </div>
         <div class="sevpills">
-          <span class="sp act">Act</span><span class="sp attend">Attend</span><span class="sp track">Track</span>
+          <span class="sp act">Act</span><span class="sp attend">Attend</span><span class="sp trackstar">Track*</span><span class="sp track">Track</span>
         </div>
       </div>
       <span class="more">details →</span>
@@ -386,7 +387,7 @@
   </div>
 
   <footer>
-    <span class="mono">MISP + CISA KEV</span> → normalize → match to org → score (L·I·E) → severity + SSVC action → route to humans &amp; EDR → triage.<br>
+    <span class="mono">MISP + CISA KEV</span> → normalize → match to org → SSVC v2.1 decision tree (Act/Attend/Track*/Track) + multiplicative score → route to humans &amp; EDR → triage.<br>
     Every block above maps to a real package. Single Go binary · SQLite · pull-all / filter-local · safe-by-default EDR export.
   </footer>
 </div>
@@ -424,10 +425,10 @@ const NODES = {
     resp:["Correlates event CVEs against the org tech stack.","Compares versions where available; falls back to a conservative product-only match when versions are missing.","Exposes a pluggable <code>Matcher</code> interface so new match strategies drop in."],
     dec:["Product-only fallback errs toward flagging rather than missing — deliberately conservative."],
     cav:["Missing CMDB versions collapse everything to product-only matches, which inflates alert volume."]},
-  risk:{band:"Correlate & score",bc:"var(--score)",title:"Risk engine",file:"internal/risk/engine.go",
-    resp:["<b>Likelihood (≤5):</b> KEV / exploited / threat-actor / freshness.","<b>Impact (≤5):</b> CVSS + asset criticality + data sensitivity.","<b>Exposure (≤3):</b> internet-facing, identity, reachability.","<b>Confidence (≤4):</b> source trust and TLP, carried as a parallel label, not folded into the score.","Combines L·I·E into a normalized <code>risk</code> score, maps to a severity band, and emits an SSVC action (Act / Attend / Track)."],
-    dec:["Separating severity (how bad) from confidence (how sure) means a high-severity, low-confidence item is visible rather than hidden.","Baseline floors keep a matched internal-only threat from collapsing to zero, so a critical internal RCE can't score as low."],
-    cav:["Internal exposure is capped, so internal-only threats top out at 'high' — a deliberate default worth revisiting for crown-jewel assets."]},
+  risk:{band:"Correlate & score",bc:"var(--score)",title:"Risk engine",file:"internal/risk/engine.go · internal/risk/ssvc.go",
+    resp:["<b>Likelihood (≤5):</b> KEV / exploited / threat-actor / freshness.","<b>Impact (≤5):</b> CVSS + asset criticality + data sensitivity.","<b>Exposure (≤3):</b> internet-facing, identity, reachability.","<b>Confidence (≤4):</b> source trust and TLP, carried as a parallel label, not folded into the score.","SSVC v2.1 decision tree is the primary output: Exploitation (KEV→active) → Exposure → Automatable → Mission Impact → Act / Attend / Track* / Track.","Multiplicative L·I·E score acts as a tiebreaker within each SSVC bucket."],
+    dec:["Separating severity from confidence means high-severity, low-confidence items are visible rather than hidden.","The SSVC tree guarantees Attend minimum for any KEV-listed CVE — the 'KEV floor' is structural, not a patched exception."],
+    cav:["Automatable defaults to CVSS≥7 heuristic; parsing vectors would improve this. EPSS (WS3) feeds the Exploitation:PoC node."]},
   alert:{band:"Correlate & score",bc:"var(--score)",title:"Alert",file:"internal/risk/alert.go",
     resp:["Wraps the scored match into an alert with a dedup identity.","Tracks a status lifecycle: new → acked → false_pos / resolved.","Persists with a rolling TTL (7 days)."],
     dec:["Dedup keeps the queue quiet when the same event is re-seen or modified."],cav:[]},
