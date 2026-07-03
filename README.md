@@ -87,27 +87,27 @@ Open **http://localhost:8080** — login with username `admin` and the password 
 ## How It Works
 
 ```
-                    ┌──────────────────────────────────────────────────────┐
-                    │         Threat Intel Arbiter (single binary)           │
-                    │                                                       │
-  MISP (pull ALL) ──┤──► Normalize ──► Filter ──► Match ──► Score          │
-  CISA KEV         ──┤       │                                   │         │
-                    │       │  CVEs · CVSS · tags · actors        ▼         │
-                    │       │  IOCs (IPs · domains · hashes)  Explain ──► Route
-                    │       │                                        │      │
-                    │       │                                        ├──► Slack
-                    │       │                                        ├──► Teams
-                    │       │                                        ├──► Email
-                    │       │                                        └──► CrowdStrike
-                    │       │                                               │
-                    │       └──► EDR Pipeline ───────► Falcon API           │
-                    │              extract · filter · dedup · batch          │
-                    │                                                       │
-                    │  SQLite: events · alerts · techstack                  │
-                    │           users · sessions · dedup                    │
-                    │                                                       │
-                    │  Web dashboard on :8080 (multi-user auth)              │
-                    └───────────────────────────────────────────────────────┘
+                    ┌────────────────────────────────────────────────────────────────────┐
+                    │                Threat Intel Arbiter (single binary)                │
+                    │                                                                    │
+  MISP (pull ALL)───┤─► Normalize ──► Filter ──► Match ──► Score                         │
+  CISA KEV         ─┤ │     │                                           │                │
+                    │ │     │  CVEs · CVSS · tags · actors                   ▼           │
+                    │ │     │  IOCs (IPs · domains · hashes)  Explain ──► Route           │
+                    │ │     │                                        │                    │
+                    │ │     │                                        ├──► Slack           │
+                    │ │     │                                        ├──► Teams           │
+                    │ │     │                                        ├──► Email           │
+                    │ │     │                                        └──► CrowdStrike     │
+                    │ │     │                                                             │
+                    │ │     └──► EDR Pipeline ───────► Falcon API                         │
+                    │ │            extract · filter · dedup · batch                       │
+                    │                                                                    │
+                    │ SQLite: events · alerts · techstack                                │
+                    │          users · sessions · dedup                                  │
+                    │                                                                    │
+                    │ Web dashboard on :8080 (multi-user auth)                           │
+                    └────────────────────────────────────────────────────────────────────┘
 ```
 
 1. **Pull** — fetches ALL events from MISP (no galaxy/tag/CVE pre-filter). MISP acts as an aggregation channel for peers, ISACs, OSINT feeds, commercial, and government sources. Filtering happens locally against your context.
