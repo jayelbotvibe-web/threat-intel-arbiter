@@ -47,11 +47,11 @@ Those platforms are heavyweight — they require infrastructure, dedicated admin
 
 ## Architecture
 
-[![Threat Intel Arbiter Architecture](docs/architecture-overview.jpg)](https://jayelbotvibe-web.github.io/threat-intel-arbiter/architecture.html)
+[**→ View interactive architecture diagram**](https://jayelbotvibe-web.github.io/threat-intel-arbiter/architecture.html)
 
-*[Click the diagram → interactive architecture page with detail drawers for every component]*
+*Click any block for detail drawers — responsibilities, design decisions, and trade-offs for every component.*
 
-Five-stage pipeline — ingestion, normalization, match & score, explanation, routing — all in a single Go binary.
+Six-band pipeline: Ingest → Normalize → Buffer → Correlate & Score → Persist → Respond & Present — all in a single Go binary.
 
 | Stage | What it does |
 |---|---|
