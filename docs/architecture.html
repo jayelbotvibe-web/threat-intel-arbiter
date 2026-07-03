@@ -1,417 +1,495 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Threat Intel Arbiter — Architecture</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'JetBrains Mono', monospace; background: #020617; min-height: 100vh; padding: 2rem; color: white; }
-    .container { max-width: 1400px; margin: 0 auto; }
-    .header { margin-bottom: 1rem; }
-    .header-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem; }
-    .pulse-dot { width: 12px; height: 12px; background: #34d399; border-radius: 50%; animation: pulse 2s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    h1 { font-size: 1.2rem; font-weight: 700; }
-    .subtitle { color: #94a3b8; font-size: 0.7rem; margin-left: 1.5rem; }
-    .diagram-container { background: rgba(15, 23, 42, 0.5); border-radius: 1rem; border: 1px solid #1e293b; padding: 1.5rem; overflow-x: auto; }
-    svg { width: 100%; min-width: 1100px; display: block; }
-    .footer { text-align: center; margin-top: 0.75rem; color: #475569; font-size: 0.65rem; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Threat Intel Arbiter — Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d14; --panel:#10141e; --panel-2:#141a26; --panel-3:#1a2130;
+    --border:#1e2635; --border-2:#2a3444;
+    --text:#d7dce6; --dim:#8a93a4; --faint:#59626f;
+    --crit:#ff5d6a; --high:#ff9d42; --med:#f5c542; --low:#7b8798;
+    --accent:#6e79ff; --accent-2:#8b8cff; --accent-soft:rgba(110,121,255,0.13);
+    --ok:#35cf8f; --violet:#bc8cff; --cyan:#4fd4e4;
+    --ingest:#4fd4e4; --normalize:#6e79ff; --score:#ff9d42; --persist:#35cf8f; --respond:#bc8cff; --present:#f5c542;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Inter",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1100px 500px at 50% -10%,rgba(110,121,255,0.07),transparent 60%),
+      radial-gradient(700px 400px at 90% 110%,rgba(188,140,255,0.05),transparent 60%);}
+  .mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:5px;border:2px solid var(--bg)}
+
+  .wrap{max-width:1140px;margin:0 auto;padding:26px 22px 90px}
+
+  /* ── header ── */
+  header{display:flex;align-items:flex-start;gap:14px;margin-bottom:6px}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#6e79ff,#4a54d6);
+    display:grid;place-items:center;box-shadow:0 0 0 1px rgba(110,121,255,0.4),0 6px 18px rgba(74,84,214,0.35);flex-shrink:0}
+  .logo svg{width:19px;height:19px}
+  h1{font-size:20px;font-weight:800;letter-spacing:-0.4px}
+  .sub{font-size:12px;color:var(--dim);margin-top:2px}
+  .sub b{color:var(--accent-2);font-weight:600}
+  .spacer{flex:1}
+  .hint{font-size:11px;color:var(--faint);border:1px solid var(--border);background:var(--panel);
+    border-radius:8px;padding:7px 11px;white-space:nowrap}
+  .hint b{color:var(--dim)}
+
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:16px 0 6px;padding:11px 14px;background:var(--panel);
+    border:1px solid var(--border);border-radius:10px;font-size:11px;color:var(--dim)}
+  .legend .li{display:flex;align-items:center;gap:6px}
+  .swatch{width:11px;height:11px;border-radius:3px}
+  .legend .flowkey{display:flex;align-items:center;gap:6px;margin-left:auto}
+  .flowline{width:26px;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);position:relative;border-radius:2px}
+
+  /* ── band scaffolding ── */
+  .band{position:relative}
+  .band-label{display:flex;align-items:center;gap:9px;margin:4px 0 10px}
+  .band-num{font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:700;color:var(--bg);
+    background:var(--bl,var(--accent));width:22px;height:22px;border-radius:6px;display:grid;place-items:center}
+  .band-name{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--bl,var(--accent))}
+  .band-desc{font-size:11px;color:var(--faint)}
+
+  /* ── nodes ── */
+  .node{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;
+    cursor:pointer;transition:.16s;overflow:hidden}
+  .node:hover{border-color:var(--nc,var(--accent));transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,0.28)}
+  .node::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--nc,var(--accent))}
+  .node .nt{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+  .node h3{font-size:14px;font-weight:700;letter-spacing:-0.2px}
+  .node .file{font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--faint);margin-bottom:9px}
+  .node .desc{font-size:11.5px;color:var(--dim);line-height:1.55}
+  .node .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+  .tag{font-size:9.5px;font-weight:600;letter-spacing:0.2px;padding:2px 7px;border-radius:5px;border:1px solid var(--border-2);color:var(--dim)}
+  .tag.mono{font-family:"JetBrains Mono",monospace;font-weight:500}
+  .more{position:absolute;right:12px;bottom:11px;font-size:10px;color:var(--faint);opacity:0;transition:.16s}
+  .node:hover .more{opacity:1;color:var(--nc,var(--accent))}
+  .ico{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;flex-shrink:0;
+    background:color-mix(in srgb,var(--nc,var(--accent)) 16%,transparent)}
+  .ico svg{width:15px;height:15px;stroke:var(--nc,var(--accent))}
+
+  .row{display:grid;gap:14px}
+  .row-2{grid-template-columns:1fr 1fr}
+  .row-3{grid-template-columns:1fr 1fr 1fr}
+
+  /* ── connectors ── */
+  .flow{height:38px;display:flex;align-items:center;justify-content:center;position:relative}
+  .flow .rail{width:2px;height:100%;background:linear-gradient(180deg,var(--border-2),var(--border-2));position:relative;border-radius:2px}
+  .flow .rail::after{content:"";position:absolute;left:-2px;top:0;width:6px;height:6px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 10px var(--accent);animation:drop 2.2s linear infinite}
+  @keyframes drop{0%{top:-6px;opacity:0}12%{opacity:1}88%{opacity:1}100%{top:100%;opacity:0}}
+  .flow .cap{position:absolute;bottom:-1px;width:9px;height:9px;border-right:2px solid var(--border-2);border-bottom:2px solid var(--border-2);transform:rotate(45deg)}
+
+  /* ── canonical model spine ── */
+  .spine{border:1.5px solid var(--normalize);background:linear-gradient(180deg,rgba(110,121,255,0.09),transparent);
+    border-radius:14px;padding:16px 18px;position:relative;cursor:pointer;transition:.16s}
+  .spine:hover{box-shadow:0 0 0 1px var(--normalize),0 12px 30px rgba(110,121,255,0.14)}
+  .spine .st{display:flex;align-items:center;gap:9px;margin-bottom:4px}
+  .spine h3{font-size:15px;font-weight:800}
+  .spine .badge{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--normalize);
+    border:1px solid var(--normalize);border-radius:5px;padding:2px 7px}
+  .fields{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+  .field{font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--dim);background:var(--bg);
+    border:1px solid var(--border-2);border-radius:6px;padding:3px 8px}
+  .field b{color:var(--accent-2);font-weight:600}
+
+  /* ── scoring engine centerpiece ── */
+  .scorebox{border:1px dashed var(--score);border-radius:12px;padding:15px;background:rgba(255,157,66,0.04);margin-top:12px}
+  .scorebox .sh{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--score);font-weight:700;margin-bottom:12px}
+  .dims{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:12px}
+  .dimc{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:9px 10px}
+  .dimc .dn{font-size:10.5px;color:var(--dim);font-weight:600;display:flex;justify-content:space-between}
+  .dimc .dn .mx{font-family:"JetBrains Mono",monospace;color:var(--faint)}
+  .dimc .db{height:4px;background:var(--panel-3);border-radius:3px;margin:7px 0 6px;overflow:hidden}
+  .dimc .db i{display:block;height:100%;border-radius:3px}
+  .dimc .df{font-size:9.5px;color:var(--faint);line-height:1.4}
+  .formula{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+    font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--dim);padding:10px;
+    background:var(--bg);border:1px solid var(--border);border-radius:9px}
+  .formula .op{color:var(--faint)}
+  .formula .out{color:var(--score);font-weight:700}
+  .arrow-r{color:var(--faint)}
+  .sevpills{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+  .sp{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;padding:3px 10px;border-radius:20px}
+  .sp.act{color:var(--crit);background:rgba(255,93,106,0.14)}
+  .sp.attend{color:var(--high);background:rgba(255,157,66,0.14)}
+  .sp.track{color:var(--low);background:rgba(123,135,152,0.14)}
+
+  /* ── branch row (context feeds match) ── */
+  .feed{display:grid;grid-template-columns:230px 40px 1fr;align-items:center;gap:0}
+  .feed .arrow-h{display:flex;align-items:center;justify-content:center;color:var(--faint)}
+  .feed .arrow-h svg{width:38px;height:14px}
+
+  /* ── fan out ── */
+  .fanout{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:12px}
+  .sink{display:flex;align-items:center;gap:9px;background:var(--bg);border:1px solid var(--border);border-radius:9px;
+    padding:9px 11px;cursor:pointer;transition:.15s}
+  .sink:hover{border-color:var(--respond)}
+  .sink .sd{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .sink .sn{font-size:12px;font-weight:600}
+  .sink .sm{font-size:10px;color:var(--faint);margin-left:auto;font-family:"JetBrains Mono",monospace}
+  .guard{font-size:9px;font-weight:700;color:var(--ok);background:rgba(53,207,143,0.12);border:1px solid rgba(53,207,143,0.3);
+    border-radius:4px;padding:1px 6px;letter-spacing:0.3px}
+
+  /* ── cross-cutting ── */
+  .xrow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .xc{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:13px 14px;cursor:pointer;transition:.15s;position:relative;overflow:hidden}
+  .xc:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .xc::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--accent)}
+  .xc h4{font-size:12.5px;font-weight:700;margin-bottom:4px}
+  .xc p{font-size:10.5px;color:var(--faint);line-height:1.5}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .col-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;display:flex;align-items:center;gap:8px}
+  .dashnote{font-size:10px;color:var(--faint);text-align:center;margin-top:8px;font-style:italic}
+
+  /* ── detail drawer ── */
+  .scrim{position:fixed;inset:0;background:rgba(3,5,10,0.6);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:.2s;z-index:40}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(500px,94vw);background:var(--panel);border-left:1px solid var(--border-2);
+    z-index:50;transform:translateX(100%);transition:transform .24s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-20px 0 60px rgba(0,0,0,0.45)}
+  .drawer.on{transform:translateX(0)}
+  .dhead{padding:20px;border-bottom:1px solid var(--border);position:relative}
+  .dhead .close{position:absolute;top:16px;right:16px;width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--dim);font-size:15px;cursor:pointer}
+  .dhead .close:hover{color:var(--text);background:var(--panel-2)}
+  .dhead .lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+  .dhead h2{font-size:19px;font-weight:800;letter-spacing:-0.3px}
+  .dhead .file{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--accent-2);margin-top:5px}
+  .dbody{padding:20px;overflow-y:auto;flex:1}
+  .dsec{margin-bottom:20px}
+  .dsec h4{font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--faint);font-weight:700;margin-bottom:9px}
+  .dsec ul{list-style:none}
+  .dsec li{font-size:12.5px;color:var(--dim);line-height:1.6;padding-left:16px;position:relative;margin-bottom:6px}
+  .dsec li::before{content:"";position:absolute;left:2px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+  .dsec.caveat li::before{background:var(--high)}
+  .dsec code{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--accent-2);background:var(--bg);padding:1px 5px;border-radius:4px}
+
+  footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--border);font-size:11px;color:var(--faint);text-align:center;line-height:1.7}
+  footer .mono{color:var(--dim)}
+
+  @media (max-width:760px){
+    .row-2,.row-3,.dims,.xrow,.fanout,.split{grid-template-columns:1fr}
+    .feed{grid-template-columns:1fr}
+    .feed .arrow-h{transform:rotate(90deg);height:30px}
+    h1{font-size:17px}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="header-row">
-        <div class="pulse-dot"></div>
-        <h1>Threat Intel Arbiter — Threat Prioritization Engine</h1>
-      </div>
-      <p class="subtitle">No galaxy/tag/CVE pre-filter at API level. Arbiter fetches ALL events from MISP — matchers decide relevance locally against org tech stack + sector + KEV. MISP is a threat intel aggregation channel, not a filtering gate.</p>
+<div class="wrap">
+
+  <header>
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" stroke="#fff" stroke-width="1.6" fill="rgba(255,255,255,0.12)"/><path d="M9 12l2 2 4-4.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div>
+      <h1>Threat Intel Arbiter — Architecture</h1>
+      <div class="sub">Org-context-aware threat prioritization · <b>single Go binary</b> · SQLite · MISP + CISA KEV → SSVC actions → EDR response</div>
     </div>
-
-    <h2 style="font-size:1rem;color:#34d399;margin-bottom:1rem;text-align:center;">▼ System Architecture ▼</h2>
-
-    <div class="diagram-container">
-      <svg viewBox="0 0 1125 1060" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <marker id="a-sl" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/></marker>
-          <marker id="a-em" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/></marker>
-          <marker id="a-am" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/></marker>
-          <marker id="a-vi" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/></marker>
-          <marker id="a-cy" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/></marker>
-          <marker id="a-or" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#fb923c"/></marker>
-          <marker id="a-bl" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/></marker>
-          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern>
-        </defs>
-
-        <rect width="100%" height="100%" fill="url(#grid)"/>
-
-        <!-- Banner -->
-        <rect x="14" y="6" width="1096" height="48" rx="6" fill="rgba(6,78,59,0.08)" stroke="#34d399" stroke-width="0.8"/>
-        <text x="30" y="26" fill="#34d399" font-size="9" font-weight="600">Threat Intel Arbiter — threat prioritization engine. One binary, 60-second deploy. Pull-all, filter-local architecture. MISP + KEV sources. Severity + Confidence + Explanation.</text>
-        <text x="30" y="44" fill="#475569" font-size="7.5">No galaxy/tag/CVE pre-filter at API level. Arbiter fetches ALL events from MISP — matchers decide relevance locally against org tech stack + sector + KEV. MISP is a threat intel aggregation channel, not a filtering gate.</text>
-
-        <!-- ============================================================
-             LEFT: INPUTS
-             ============================================================ -->
-
-        <!-- Org Profile -->
-        <rect x="14" y="72" width="155" height="55" rx="6" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="1.5"/>
-        <text x="91" y="94" fill="white" font-size="10" font-weight="600" text-anchor="middle">Organisation Profile</text>
-        <text x="91" y="112" fill="#94a3b8" font-size="8" text-anchor="middle">Name · Sector · Country</text>
-        <text x="91" y="124" fill="#3b82f6" font-size="7" text-anchor="middle">NIS sector: Energy</text>
-
-        <!-- CMDB -->
-        <rect x="14" y="148" width="155" height="68" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
-        <text x="91" y="170" fill="white" font-size="10" font-weight="600" text-anchor="middle">CMDB / Asset Tools</text>
-        <text x="91" y="188" fill="#94a3b8" font-size="7.5" text-anchor="middle">ServiceNow · Ivanti · BMC</text>
-        <text x="91" y="202" fill="#94a3b8" font-size="7.5" text-anchor="middle">Snipe-IT · GLPI · NetBox</text>
-        <text x="91" y="214" fill="#fbbf24" font-size="7" text-anchor="middle">Export → techstack.csv</text>
-
-        <!-- Config Files -->
-        <rect x="14" y="240" width="155" height="44" rx="5" fill="rgba(76,29,149,0.08)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3"/>
-        <text x="91" y="260" fill="#a78bfa" font-size="9" font-weight="600" text-anchor="middle">Config Files</text>
-        <text x="91" y="278" fill="#94a3b8" font-size="7.5" text-anchor="middle">techstack.csv · routing.yaml · risk.yaml · sources.yaml</text>
-
-        <!-- MISP (primary v1 source) — aggregation channel -->
-        <rect x="14" y="310" width="155" height="100" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
-        <text x="91" y="334" fill="white" font-size="10" font-weight="600" text-anchor="middle">MISP ★ v1 primary</text>
-        <text x="91" y="352" fill="#fbbf24" font-size="7" text-anchor="middle">Aggregation channel</text>
-        <text x="91" y="368" fill="#94a3b8" font-size="7" text-anchor="middle">Peers · ISACs · OSINT · Commer.</text>
-        <text x="91" y="384" fill="#94a3b8" font-size="7.5" text-anchor="middle">REST · HMAC · pull ALL events</text>
-        <text x="91" y="400" fill="#94a3b8" font-size="7" text-anchor="middle">No galaxy/tag/CVE pre-filter</text>
-        <text x="91" y="412" fill="#fbbf24" font-size="6.5" text-anchor="middle">Rich data: all 4 risk dims</text>
-
-        <!-- KEV (v1 secondary) -->
-        <rect x="14" y="430" width="155" height="52" rx="6" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="1.5"/>
-        <text x="91" y="452" fill="white" font-size="10" font-weight="600" text-anchor="middle">CISA KEV ★ v1</text>
-        <text x="91" y="470" fill="#94a3b8" font-size="7.5" text-anchor="middle">JSON GET · no auth · daily</text>
-        <text x="91" y="482" fill="#3b82f6" font-size="7" text-anchor="middle">Actively exploited CVEs</text>
-
-        <!-- Future sources (grayed) -->
-        <rect x="14" y="502" width="155" height="38" rx="5" fill="rgba(30,41,59,0.3)" stroke="#475569" stroke-width="1" stroke-dasharray="4,4"/>
-        <text x="91" y="520" fill="#475569" font-size="7.5" text-anchor="middle">v2: NVD · GitHub Advisory</text>
-        <text x="91" y="534" fill="#475569" font-size="7" text-anchor="middle">Vendor feeds · RSS · VulnCheck</text>
-
-        <!-- ============================================================
-             THREATLIB CORE
-             ============================================================ -->
-        <rect x="195" y="62" width="555" height="978" rx="12" fill="rgba(6,78,59,0.03)" stroke="#34d399" stroke-width="1.5" stroke-dasharray="8,4"/>
-        <text x="472" y="82" fill="#34d399" font-size="10" font-weight="600" text-anchor="middle">Threat Intel Arbiter — Single Go Binary · One binary per org (v1)</text>
-
-        <!-- AUTH -->
-        <rect x="212" y="102" width="520" height="42" rx="6" fill="rgba(136,19,55,0.2)" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="4,4"/>
-        <text x="472" y="120" fill="#fb7185" font-size="9" font-weight="600" text-anchor="middle">🔒 Auth Gate — X-Arbiter-Key header · Bind localhost · 0600 file perms · Env vars for secrets</text>
-        <text x="472" y="136" fill="#94a3b8" font-size="7.5" text-anchor="middle">REST API (GET) :8080 · Admin API (POST/PUT, auth required) :8080</text>
-
-        <!-- Startup -->
-        <rect x="212" y="156" width="520" height="22" rx="3" fill="rgba(34,197,94,0.05)" stroke="#22c55e" stroke-width="0.6" stroke-dasharray="3,3"/>
-        <text x="472" y="172" fill="#22c55e" font-size="7.5" text-anchor="middle">▶ Startup: load config → fetch warninglists + KEV → open SQLite → migrate → start goroutines</text>
-
-        <!-- ============================================================
-             LAYER 1: INGESTION
-             ============================================================ -->
-        <rect x="212" y="196" width="260" height="78" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
-        <text x="342" y="216" fill="white" font-size="9" font-weight="600" text-anchor="middle">Source Pollers (cron goroutines)</text>
-        <text x="342" y="234" fill="#94a3b8" font-size="7.5" text-anchor="middle">MISP: GET /events/restSearch (15m)</text>
-        <text x="342" y="250" fill="#fbbf24" font-size="7" text-anchor="middle">Unfiltered: no galaxy/tag/CVE param</text>
-        <text x="342" y="266" fill="#94a3b8" font-size="7.5" text-anchor="middle">KEV: GET cisa.gov/kev.json (daily)</text>
-
-        <!-- Normalizers -->
-        <rect x="490" y="196" width="242" height="78" rx="6" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.2"/>
-        <text x="611" y="216" fill="white" font-size="9" font-weight="600" text-anchor="middle">Normalization Layer</text>
-        <text x="611" y="234" fill="#94a3b8" font-size="7.5" text-anchor="middle">Extracts: CVEs · CVSS · tags · actors · refs · IOCs (IPs · domains · hashes)</text>
-        <text x="611" y="250" fill="#475569" font-size="7" text-anchor="middle">IOCs routed to EDR (Crowdstrike Falcon) — OAuth2 · batch · dedup</text>
-        <text x="611" y="266" fill="#34d399" font-size="7.5" text-anchor="middle">Canonical ThreatEvent: source-agnostic</text>
-
-        <!-- Warning Filter -->
-        <rect x="490" y="298" width="242" height="48" rx="6" fill="rgba(136,19,55,0.2)" stroke="#fb7185" stroke-width="1.5"/>
-        <text x="611" y="318" fill="white" font-size="9" font-weight="600" text-anchor="middle">Warning List Filter</text>
-        <text x="611" y="336" fill="#94a3b8" font-size="7.5" text-anchor="middle">Drop: TLP:RED · disputed CVEs · false positives · noticelists</text>
-
-        <!-- Event Queue -->
-        <rect x="490" y="366" width="242" height="38" rx="6" fill="rgba(251,146,60,0.15)" stroke="#fb923c" stroke-width="1.5"/>
-        <text x="611" y="386" fill="white" font-size="9" font-weight="600" text-anchor="middle">Event Queue (buffered chan · FIFO · Drain on SIGTERM)</text>
-
-        <!-- Cold start annotation -->
-        <rect x="212" y="196" width="170" height="16" rx="3" fill="rgba(251,191,36,0.08)" stroke="#fbbf24" stroke-width="0.5" stroke-dasharray="2,2"/>
-        <text x="297" y="208" fill="#fbbf24" font-size="6.5" text-anchor="middle">Cold: 7d · all events → score → suppress < high</text>
-
-        <!-- ============================================================
-             LAYER 2: MATCHING
-             ============================================================ -->
-        <rect x="212" y="435" width="520" height="210" rx="6" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.5"/>
-        <text x="472" y="458" fill="white" font-size="10" font-weight="600" text-anchor="middle">Matching Engine (pluggable — Matcher interface)</text>
-
-        <!-- Tier 1: CVE -->
-        <rect x="228" y="474" width="240" height="90" rx="5" fill="rgba(6,78,59,0.5)" stroke="#34d399" stroke-width="0.8"/>
-        <text x="348" y="494" fill="#34d399" font-size="8.5" font-weight="600" text-anchor="middle">Tier 1 — CVEMatcher</text>
-        <text x="348" y="512" fill="#94a3b8" font-size="7.5" text-anchor="middle">Extract CVE IDs → normalize vendor</text>
-        <text x="348" y="528" fill="#94a3b8" font-size="7.5" text-anchor="middle">Scheme-detect version → compare</text>
-        <text x="348" y="544" fill="#94a3b8" font-size="7.5" text-anchor="middle">Vers. subsystem: semver/date/sap/win/kernel</text>
-        <text x="348" y="560" fill="#34d399" font-size="7" text-anchor="middle">Match confidence: exact / product_only / unparseable</text>
-
-        <!-- Tier 2: Sector -->
-        <rect x="478" y="474" width="240" height="90" rx="5" fill="rgba(59,130,246,0.12)" stroke="#3b82f6" stroke-width="0.8"/>
-        <text x="598" y="494" fill="#3b82f6" font-size="8.5" font-weight="600" text-anchor="middle">Tier 2 — SectorMatcher</text>
-        <text x="598" y="512" fill="#94a3b8" font-size="7.5" text-anchor="middle">Check event tags: eu-nis-oes · dhs-ciip</text>
-        <text x="598" y="528" fill="#94a3b8" font-size="7.5" text-anchor="middle">nis2 · targeted-threat-index</text>
-        <text x="598" y="544" fill="#94a3b8" font-size="7.5" text-anchor="middle">Cross-ref org sector profile</text>
-        <text x="598" y="560" fill="#3b82f6" font-size="7" text-anchor="middle">Works on events with and without CVEs</text>
-
-        <!-- KEV Matcher -->
-        <rect x="340" y="576" width="230" height="28" rx="4" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="0.6"/>
-        <text x="455" y="594" fill="#3b82f6" font-size="7.5" text-anchor="middle">KEVMatcher: CVE ∈ KEV → actively exploited (+3)</text>
-
-        <!-- Match output -->
-        <rect x="228" y="614" width="490" height="22" rx="4" fill="rgba(34,211,238,0.05)" stroke="#22d3ee" stroke-width="0.6"/>
-        <text x="473" y="630" fill="#22d3ee" font-size="7.5" text-anchor="middle">Match list: [{cve, app, version_affected, match_confidence, sector_match}] → feeds Risk Engine</text>
-
-        <!-- ============================================================
-             LAYER 3: RISK PRIORITIZATION
-             ============================================================ -->
-        <rect x="212" y="670" width="520" height="185" rx="6" fill="rgba(136,19,55,0.25)" stroke="#fb7185" stroke-width="1.5"/>
-        <text x="472" y="694" fill="white" font-size="10" font-weight="600" text-anchor="middle">Risk Prioritization Engine</text>
-
-        <!-- Formula -->
-        <rect x="228" y="706" width="165" height="30" rx="4" fill="rgba(34,211,238,0.08)" stroke="#22d3ee" stroke-width="0.6"/>
-        <text x="310" y="726" fill="#22d3ee" font-size="8" font-weight="600" text-anchor="middle">score = (L×I×E) / (maxL×maxI×maxE)</text>
-
-        <!-- Four dimensions -->
-        <rect x="228" y="746" width="120" height="98" rx="4" fill="rgba(15,23,42,0.5)" stroke="#3b82f6" stroke-width="0.5"/>
-        <text x="288" y="765" fill="#3b82f6" font-size="8" font-weight="600" text-anchor="middle">Likelihood</text>
-        <text x="240" y="783" fill="#94a3b8" font-size="7">KEV active expl. +3</text>
-        <text x="240" y="797" fill="#94a3b8" font-size="7">Weaponized +2</text>
-        <text x="240" y="811" fill="#94a3b8" font-size="7">Actor activity +1</text>
-        <text x="240" y="825" fill="#94a3b8" font-size="7">Freshness +1</text>
-        <text x="240" y="839" fill="#475569" font-size="7">Max: 5</text>
-
-        <rect x="360" y="746" width="120" height="98" rx="4" fill="rgba(15,23,42,0.5)" stroke="#fb7185" stroke-width="0.5"/>
-        <text x="420" y="765" fill="#fb7185" font-size="8" font-weight="600" text-anchor="middle">Impact</text>
-        <text x="372" y="783" fill="#94a3b8" font-size="7">CVSS≥9.0 +3</text>
-        <text x="372" y="797" fill="#94a3b8" font-size="7">App critical +2</text>
-        <text x="372" y="811" fill="#94a3b8" font-size="7">Sensitive data +1</text>
-        <text x="372" y="825" fill="#94a3b8" font-size="7">CVSS 7-8.9 +2</text>
-        <text x="372" y="839" fill="#475569" font-size="7">Max: 5</text>
-
-        <rect x="492" y="746" width="120" height="98" rx="4" fill="rgba(15,23,42,0.5)" stroke="#22d3ee" stroke-width="0.5"/>
-        <text x="552" y="765" fill="#22d3ee" font-size="8" font-weight="600" text-anchor="middle">Exposure</text>
-        <text x="504" y="783" fill="#94a3b8" font-size="7">Internet-facing +2</text>
-        <text x="504" y="797" fill="#94a3b8" font-size="7">Untrusted net. +1</text>
-        <text x="504" y="811" fill="#94a3b8" font-size="7">Cred. exposure +1</text>
-        <text x="504" y="839" fill="#475569" font-size="7">Max: 3</text>
-
-        <rect x="624" y="746" width="94" height="50" rx="4" fill="rgba(15,23,42,0.5)" stroke="#a78bfa" stroke-width="0.5"/>
-        <text x="671" y="765" fill="#a78bfa" font-size="7.5" font-weight="600" text-anchor="middle">Confidence</text>
-        <text x="636" y="783" fill="#94a3b8" font-size="6.5">KEV/CERT +3</text>
-        <text x="636" y="795" fill="#94a3b8" font-size="6.5">Max: 4</text>
-
-        <!-- Severity output -->
-        <rect x="228" y="850" width="490" height="22" rx="4" fill="rgba(34,211,238,0.05)" stroke="#22d3ee" stroke-width="0.6"/>
-        <text x="473" y="866" fill="#22d3ee" font-size="7.5" text-anchor="middle">Output: severity label (crit ≥0.50, high ≥0.25, med ≥0.10, low <0.10) + confidence label + explanation</text>
-
-        <!-- Calibration note -->
-        <rect x="624" y="808" width="94" height="36" rx="3" fill="rgba(251,191,36,0.06)" stroke="#fbbf24" stroke-width="0.5" stroke-dasharray="2,2"/>
-        <text x="671" y="822" fill="#fbbf24" font-size="6.5" text-anchor="middle">⚠ Thresholds</text>
-        <text x="671" y="836" fill="#fbbf24" font-size="6.5" text-anchor="middle">uncalibrated</text>
-        <text x="671" y="848" fill="#94a3b8" font-size="6">calibrate via</text>
-        <text x="671" y="858" fill="#94a3b8" font-size="6">feedback loop</text>
-
-        <!-- ============================================================
-             LAYER 4: EXPLAINABILITY + DEDUP + ROUTING
-             ============================================================ -->
-
-        <rect x="212" y="885" width="255" height="52" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
-        <text x="339" y="906" fill="white" font-size="9" font-weight="600" text-anchor="middle">Explainability Engine</text>
-        <text x="339" y="924" fill="#94a3b8" font-size="7.5" text-anchor="middle">Generated from same struct that computed score</text>
-
-        <rect x="480" y="885" width="252" height="52" rx="6" fill="rgba(136,19,55,0.25)" stroke="#fb7185" stroke-width="1.5"/>
-        <text x="606" y="906" fill="white" font-size="9" font-weight="600" text-anchor="middle">Dedup + Suppression</text>
-        <text x="606" y="924" fill="#94a3b8" font-size="7.5" text-anchor="middle">Hash(CVE+app+source) · 7d TTL · 2 sources → 1 alert</text>
-
-        <rect x="212" y="958" width="520" height="50" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
-        <text x="472" y="980" fill="white" font-size="10" font-weight="600" text-anchor="middle">Notification Router — by Severity + Confidence</text>
-        <text x="472" y="998" fill="#94a3b8" font-size="7.5" text-anchor="middle">critical+high → #sec-alerts · critical+low → #sec-review · high+low → daily digest · medium → weekly</text>
-
-        <!-- Calibration feedback loop -->
-        <path d="M 255 937 L 255 1030 Q 255 1042 243 1042 L 172 1042 Q 160 1042 160 1030 L 160 768 Q 160 756 172 756 L 212 756" fill="none" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#a-vi)"/>
-        <text x="135" y="900" fill="#a78bfa" font-size="7" text-anchor="middle" transform="rotate(-90,135,900)">false_pos feedback loop (calibration)</text>
-
-        <!-- ============================================================
-             RIGHT: OUTPUTS
-             ============================================================ -->
-        <rect x="778" y="196" width="148" height="48" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
-        <text x="852" y="218" fill="white" font-size="9" font-weight="600" text-anchor="middle">Slack #sec-alerts</text>
-        <text x="852" y="236" fill="#94a3b8" font-size="7.5" text-anchor="middle">Critical+High+High conf.</text>
-
-        <rect x="778" y="268" width="148" height="48" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
-        <text x="852" y="290" fill="white" font-size="9" font-weight="600" text-anchor="middle">Slack #sec-review</text>
-        <text x="852" y="308" fill="#94a3b8" font-size="7.5" text-anchor="middle">Critical+Low+Low conf.</text>
-
-        <rect x="778" y="340" width="148" height="48" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
-        <text x="852" y="362" fill="white" font-size="9" font-weight="600" text-anchor="middle">Slack #it-ops</text>
-        <text x="852" y="380" fill="#94a3b8" font-size="7.5" text-anchor="middle">High+Med+High confidence</text>
-
-        <rect x="778" y="412" width="148" height="48" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
-        <text x="852" y="434" fill="white" font-size="9" font-weight="600" text-anchor="middle">Email · Teams · Webhook</text>
-        <text x="852" y="452" fill="#94a3b8" font-size="7.5" text-anchor="middle">Digest · Custom routing</text>
-
-        <!-- Crowdstrike EDR -->
-        <rect x="778" y="484" width="148" height="48" rx="6" fill="rgba(180,83,9,0.2)" stroke="#f59e0b" stroke-width="1.5"/>
-        <text x="852" y="506" fill="#f59e0b" font-size="9" font-weight="600" text-anchor="middle">Crowdstrike Falcon</text>
-        <text x="852" y="524" fill="#94a3b8" font-size="7.5" text-anchor="middle">IOCs · OAuth2 · batch · dedup</text>
-
-        <!-- Dead Letter -->
-        <rect x="778" y="556" width="148" height="42" rx="6" fill="rgba(136,19,55,0.2)" stroke="#fb7185" stroke-width="1.2" stroke-dasharray="4,4"/>
-        <text x="852" y="576" fill="#fb7185" font-size="8.5" font-weight="600" text-anchor="middle">⚠ Dead Letter</text>
-        <text x="852" y="592" fill="#94a3b8" font-size="7" text-anchor="middle">3× fail → log + health alert</text>
-
-        <!-- People -->
-        <rect x="955" y="196" width="135" height="48" rx="6" fill="rgba(30,41,59,0.35)" stroke="#94a3b8" stroke-width="1"/>
-        <text x="1022" y="218" fill="white" font-size="9" font-weight="600" text-anchor="middle">SOC Analysts</text>
-        <text x="1022" y="238" fill="#94a3b8" font-size="7.5" text-anchor="middle">Critical · Real-time</text>
-
-        <rect x="955" y="268" width="135" height="48" rx="6" fill="rgba(30,41,59,0.35)" stroke="#94a3b8" stroke-width="1"/>
-        <text x="1022" y="290" fill="white" font-size="9" font-weight="600" text-anchor="middle">IT Operations</text>
-        <text x="1022" y="310" fill="#94a3b8" font-size="7.5" text-anchor="middle">High · Patch alerts</text>
-
-        <rect x="955" y="340" width="135" height="48" rx="6" fill="rgba(30,41,59,0.35)" stroke="#94a3b8" stroke-width="1"/>
-        <text x="1022" y="362" fill="white" font-size="9" font-weight="600" text-anchor="middle">CISO / IR Team</text>
-        <text x="1022" y="382" fill="#94a3b8" font-size="7.5" text-anchor="middle">Medium · Weekly digest</text>
-
-        <!-- ============================================================
-             STORAGE
-             ============================================================ -->
-        <rect x="212" y="622" width="350" height="36" rx="5" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1"/>
-        <text x="387" y="640" fill="white" font-size="8.5" font-weight="600" text-anchor="middle">SQLite (pure Go) · 10 tables · Alert state: new→acked→false_pos→resolved</text>
-        <text x="387" y="654" fill="#94a3b8" font-size="7" text-anchor="middle">sources · events · alerts · tech_stack · risk_config · routing_rules · matchers_config · dedup_hashes · sighting_cache · notification_targets</text>
-
-        <!-- ============================================================
-             ARROWS
-             ============================================================ -->
-
-        <!-- CMDB → Admin API -->
-        <line x1="169" y1="180" x2="210" y2="180" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#a-sl)"/>
-        <text x="186" y="175" fill="#94a3b8" font-size="7" text-anchor="middle">CSV</text>
-
-        <!-- MISP → Pollers -->
-        <line x1="169" y1="360" x2="210" y2="230" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#a-am)"/>
-        <text x="186" y="290" fill="#fbbf24" font-size="7" text-anchor="middle">ALL events</text>
-        <text x="186" y="302" fill="#fbbf24" font-size="6" text-anchor="middle">no filter</text>
-
-        <!-- KEV → Pollers -->
-        <line x1="169" y1="456" x2="210" y2="246" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#a-bl)"/>
-        <text x="186" y="350" fill="#3b82f6" font-size="7" text-anchor="middle">JSON</text>
-
-        <!-- Org Profile → Tier 2 -->
-        <path d="M 91 127 L 91 500 Q 91 510 180 510 L 230 510 Q 240 510 240 519 L 240 540" fill="none" stroke="#3b82f6" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#a-bl)"/>
-        <text x="72" y="320" fill="#3b82f6" font-size="7" text-anchor="middle">sector</text>
-
-        <!-- Pollers → Normalizers -->
-        <line x1="472" y1="235" x2="488" y2="235" stroke="#34d399" stroke-width="1.2" marker-end="url(#a-em)"/>
-
-        <!-- Normalizers → Warning Filter -->
-        <line x1="611" y1="274" x2="611" y2="296" stroke="#34d399" stroke-width="1.2" marker-end="url(#a-em)"/>
-
-        <!-- Warning Filter → Queue -->
-        <line x1="611" y1="346" x2="611" y2="364" stroke="#34d399" stroke-width="1.2" marker-end="url(#a-em)"/>
-
-        <!-- Queue → Match Engine -->
-        <line x1="611" y1="404" x2="611" y2="433" stroke="#fb923c" stroke-width="1.5" marker-end="url(#a-or)"/>
-
-        <!-- Match → Risk -->
-        <line x1="472" y1="645" x2="472" y2="668" stroke="#34d399" stroke-width="1.5" marker-end="url(#a-em)"/>
-
-        <!-- Risk → Explainability -->
-        <line x1="339" y1="870" x2="339" y2="883" stroke="#34d399" stroke-width="1.5" marker-end="url(#a-em)"/>
-
-        <!-- Risk → Dedup -->
-        <line x1="472" y1="870" x2="606" y2="883" stroke="#34d399" stroke-width="1.5" marker-end="url(#a-em)"/>
-
-        <!-- Explain + Dedup → Router -->
-        <line x1="339" y1="937" x2="339" y2="956" stroke="#34d399" stroke-width="1.5" marker-end="url(#a-em)"/>
-        <line x1="606" y1="937" x2="606" y2="956" stroke="#34d399" stroke-width="1.5" marker-end="url(#a-em)"/>
-
-        <!-- Router → Outputs -->
-        <line x1="732" y1="975" x2="776" y2="228" stroke="#22d3ee" stroke-width="1.2" marker-end="url(#a-cy)"/>
-        <text x="748" y="600" fill="#22d3ee" font-size="7" text-anchor="middle">critical+high c.</text>
-
-        <line x1="732" y1="983" x2="776" y2="295" stroke="#22d3ee" stroke-width="1.2" marker-end="url(#a-cy)"/>
-        <text x="750" y="640" fill="#22d3ee" font-size="7" text-anchor="middle">critical+low c.</text>
-
-        <line x1="732" y1="991" x2="776" y2="365" stroke="#22d3ee" stroke-width="1.2" marker-end="url(#a-cy)"/>
-        <text x="750" y="690" fill="#22d3ee" font-size="7" text-anchor="middle">high+high c.</text>
-
-        <line x1="732" y1="999" x2="776" y2="435" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#a-sl)"/>
-        <text x="752" y="720" fill="#94a3b8" font-size="7" text-anchor="middle">digest · custom</text>
-
-        <line x1="732" y1="987" x2="776" y2="506" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#a-cy)"/>
-        <text x="752" y="770" fill="#f59e0b" font-size="7" text-anchor="middle">IOCs → EDR</text>
-
-        <line x1="732" y1="995" x2="776" y2="578" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a-sl)"/>
-        <text x="752" y="820" fill="#fb7185" font-size="7" text-anchor="middle">3× fail</text>
-
-        <!-- Output → People -->
-        <line x1="926" y1="222" x2="953" y2="222" stroke="#22d3ee" stroke-width="1" marker-end="url(#a-cy)"/>
-        <line x1="926" y1="295" x2="953" y2="295" stroke="#22d3ee" stroke-width="1" marker-end="url(#a-cy)"/>
-        <line x1="926" y1="365" x2="953" y2="365" stroke="#22d3ee" stroke-width="1" marker-end="url(#a-cy)"/>
-
-        <!-- DB arrows -->
-        <path d="M 350 435 L 350 408 L 512 408" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#a-vi)"/>
-        <text x="435" y="403" fill="#a78bfa" font-size="7">tech stack</text>
-
-        <path d="M 260 670 L 260 660" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#a-vi)"/>
-
-        <path d="M 550 622 L 550 545" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#a-vi)"/>
-        <text x="558" y="585" fill="#a78bfa" font-size="7">read</text>
-
-        <!-- Sighting data bypass -->
-        <path d="M 91 410 L 91 750 Q 91 760 180 760 L 210 760" fill="none" stroke="#3b82f6" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#a-bl)"/>
-        <text x="72" y="600" fill="#3b82f6" font-size="7" text-anchor="middle">sightings</text>
-
-        <!-- Health -->
-        <rect x="212" y="1020" width="520" height="14" rx="3" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="0.5"/>
-        <text x="472" y="1031" fill="#94a3b8" font-size="7" text-anchor="middle">GET /health · GET /metrics · stdout logging · Dead letter alerts · Graceful shutdown (SIGTERM → drain queue → close DB)</text>
-
-        <!-- ============================================================
-             LEGEND
-             ============================================================ -->
-        <rect x="778" y="570" width="312" height="210" rx="6" fill="rgba(15,23,42,0.6)" stroke="#1e293b" stroke-width="1"/>
-        <text x="934" y="594" fill="white" font-size="10" font-weight="600" text-anchor="middle">Legend</text>
-
-        <rect x="790" y="610" width="14" height="10" rx="2" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1"/>
-        <text x="812" y="620" fill="#94a3b8" font-size="8">MISP (v1 primary source)</text>
-
-        <rect x="790" y="630" width="14" height="10" rx="2" fill="rgba(59,130,246,0.12)" stroke="#3b82f6" stroke-width="1"/>
-        <text x="812" y="640" fill="#94a3b8" font-size="8">CISA KEV / Tier 2 / Sector</text>
-
-        <rect x="790" y="650" width="14" height="10" rx="2" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
-        <text x="812" y="660" fill="#94a3b8" font-size="8">Core pipeline / Matching</text>
-
-        <rect x="790" y="670" width="14" height="10" rx="2" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1"/>
-        <text x="812" y="680" fill="#94a3b8" font-size="8">Auth / Filter / Dead Letter</text>
-
-        <rect x="790" y="690" width="14" height="10" rx="2" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1"/>
-        <text x="812" y="700" fill="#94a3b8" font-size="8">SQLite Database</text>
-
-        <rect x="790" y="710" width="14" height="10" rx="2" fill="rgba(251,146,60,0.15)" stroke="#fb923c" stroke-width="1"/>
-        <text x="812" y="720" fill="#94a3b8" font-size="8">Event Queue (channel)</text>
-
-        <rect x="790" y="730" width="14" height="10" rx="2" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
-        <text x="812" y="740" fill="#94a3b8" font-size="8">Notification Target</text>
-
-        <line x1="790" y1="752" x2="804" y2="752" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3"/>
-        <text x="812" y="754" fill="#94a3b8" font-size="8">DB read/write</text>
-
-        <line x1="924" y1="752" x2="938" y2="752" stroke="#a78bfa" stroke-width="1" stroke-dasharray="5,4"/>
-        <text x="946" y="754" fill="#94a3b8" font-size="8">Feedback loop</text>
-
-        <line x1="790" y1="770" x2="804" y2="770" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,3"/>
-        <text x="812" y="772" fill="#94a3b8" font-size="8">Dead letter / failure</text>
-      </svg>
-    </div>
-    <p class="footer">Threat Intel Arbiter v5 · Single binary · deploy in 60s · MISP+KEV (v1) · Severity+Confidence+Explanation · Raw-points/max-points formula · Calibration feedback loop · github.com/jayelbotvibe-web/threat-intel-arbiter</p>
+    <span class="spacer"></span>
+    <div class="hint">Click any block for <b>details</b></div>
+  </header>
+
+  <div class="legend">
+    <div class="li"><span class="swatch" style="background:var(--ingest)"></span> Ingest</div>
+    <div class="li"><span class="swatch" style="background:var(--normalize)"></span> Normalize</div>
+    <div class="li"><span class="swatch" style="background:var(--score)"></span> Correlate &amp; score</div>
+    <div class="li"><span class="swatch" style="background:var(--persist)"></span> Persist</div>
+    <div class="li"><span class="swatch" style="background:var(--respond)"></span> Respond</div>
+    <div class="li"><span class="swatch" style="background:var(--present)"></span> Present</div>
+    <div class="flowkey"><span class="flowline"></span> data flow</div>
   </div>
+
+  <!-- ── 1 · INGEST ── -->
+  <div class="band">
+    <div class="band-label" style="--bl:var(--ingest)"><span class="band-num" style="--bl:var(--ingest)">1</span><span class="band-name" style="--bl:var(--ingest)">Ingest</span><span class="band-desc">pull-all, filter-local — sources normalize into one type</span></div>
+    <div class="row row-2">
+      <div class="node" style="--nc:var(--ingest)" data-node="misp">
+        <div class="nt"><span class="ico"><svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path d="M12 3v18M3 12h18" stroke-linecap="round"/><circle cx="12" cy="12" r="9"/></svg></span><h3>MISP feed</h3></div>
+        <div class="file">internal/source/misp.go · poller.go</div>
+        <div class="desc">Polls <span class="mono">restSearch</span> on an incremental timestamp cursor, paginated. Normalizes attributes into CVEs, IOCs, tags, threat-actor galaxies, and TLP.</div>
+        <div class="tags"><span class="tag">incremental cursor</span><span class="tag">paginated</span><span class="tag mono">TLP-aware</span></div>
+        <span class="more">details →</span>
+      </div>
+      <div class="node" style="--nc:var(--ingest)" data-node="kev">
+        <div class="nt"><span class="ico"><svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z" stroke-linejoin="round"/></svg></span><h3>CISA KEV</h3></div>
+        <div class="file">internal/source/kev.go</div>
+        <div class="desc">Known Exploited Vulnerabilities catalog. Flags CVEs as <em>actively exploited in the wild</em> — the strongest single likelihood signal in scoring.</div>
+        <div class="tags"><span class="tag">exploitation signal</span><span class="tag mono">CVE→KEV</span></div>
+        <span class="more">details →</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow"><div class="rail"></div><div class="cap"></div></div>
+
+  <!-- ── 2 · NORMALIZE (spine) ── -->
+  <div class="band">
+    <div class="band-label" style="--bl:var(--normalize)"><span class="band-num" style="--bl:var(--normalize)">2</span><span class="band-name" style="--bl:var(--normalize)">Normalize</span><span class="band-desc">the canonical type every component operates on</span></div>
+    <div class="spine" data-node="model">
+      <div class="st"><span class="badge">model.ThreatEvent</span><h3>Canonical Threat Event</h3></div>
+      <div class="desc" style="color:var(--dim);font-size:12px">Source-specific detail is erased here. Adding a new source means writing one normalizer — every downstream stage stays unchanged.</div>
+      <div class="fields">
+        <span class="field"><b>Source</b> · Confidence</span>
+        <span class="field">Title · Description</span>
+        <span class="field"><b>CVEs</b>[]</span>
+        <span class="field"><b>IOCs</b>[] · ipv4/ipv6/domain/sha256/md5</span>
+        <span class="field">Tags[]</span>
+        <span class="field">ThreatActors[]</span>
+        <span class="field">References[]</span>
+        <span class="field">Published</span>
+      </div>
+      <span class="more" style="opacity:.7">click for details →</span>
+    </div>
+  </div>
+
+  <div class="flow"><div class="rail"></div><div class="cap"></div></div>
+
+  <!-- ── 3 · QUEUE ── -->
+  <div class="band">
+    <div class="band-label" style="--bl:var(--normalize)"><span class="band-num" style="--bl:var(--normalize)">3</span><span class="band-name" style="--bl:var(--normalize)">Buffer</span><span class="band-desc">decouple ingestion from processing</span></div>
+    <div class="node" style="--nc:var(--normalize)" data-node="queue">
+      <div class="nt"><span class="ico"><svg fill="none" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="8" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="8" rx="1"/><rect x="17" y="8" width="4" height="8" rx="1"/></svg></span><h3>Event queue</h3></div>
+      <div class="file">cmd/arbiter/main.go — in-memory channel</div>
+      <div class="desc">A Go channel buffers normalized events and hands them to a single consumer goroutine, so a slow scoring pass never blocks the pollers.</div>
+      <div class="tags"><span class="tag mono">chan ThreatEvent</span><span class="tag">single consumer</span><span class="tag">cursor re-pull on restart</span></div>
+      <span class="more">details →</span>
+    </div>
+  </div>
+
+  <div class="flow"><div class="rail"></div><div class="cap"></div></div>
+
+  <!-- ── 4 · CORRELATE & SCORE ── -->
+  <div class="band">
+    <div class="band-label" style="--bl:var(--score)"><span class="band-num" style="--bl:var(--score)">4</span><span class="band-name" style="--bl:var(--score)">Correlate &amp; score</span><span class="band-desc">match to the org, then rank by what it means here</span></div>
+
+    <!-- org context feeds match -->
+    <div class="feed" style="margin-bottom:14px">
+      <div class="node" style="--nc:var(--cyan)" data-node="orgctx">
+        <div class="nt"><span class="ico" style="--nc:var(--cyan)"><svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path d="M3 21V8l9-5 9 5v13M9 21v-6h6v6"/></svg></span><h3>Org context (CMDB)</h3></div>
+        <div class="file">tech stack · CSV import</div>
+        <div class="desc">Apps with version, criticality, internet-facing, hosts, data sensitivity. The load-bearing input — match quality is capped by CMDB hygiene.</div>
+      </div>
+      <div class="arrow-h"><svg viewBox="0 0 38 14" fill="none"><path d="M0 7h32m0 0l-6-5m6 5l-6 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="row" style="grid-template-columns:1fr 1fr">
+        <div class="node" style="--nc:var(--score)" data-node="filter">
+          <div class="nt"><h3 style="font-size:13px">Filter</h3></div>
+          <div class="file">internal/filter</div>
+          <div class="desc">TLP gate (drops <span class="mono">tlp:red</span>) and relevance pre-checks before expensive matching.</div>
+        </div>
+        <div class="node" style="--nc:var(--score)" data-node="match">
+          <div class="nt"><h3 style="font-size:13px">Match engine</h3></div>
+          <div class="file">internal/match · match/version</div>
+          <div class="desc">CVE ↔ tech stack with version comparison and a conservative product-only fallback. Pluggable <span class="mono">Matcher</span>.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- risk engine centerpiece -->
+    <div class="node" style="--nc:var(--score);cursor:pointer" data-node="risk">
+      <div class="nt"><span class="ico" style="--nc:var(--score)"><svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path d="M3 17l5-5 4 3 8-8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 4h4v4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h3>Risk engine</h3><span class="tag mono" style="margin-left:auto">internal/risk/engine.go</span></div>
+      <div class="desc">Scores each match across four dimensions, combines them into a normalized risk score, then maps to a severity band and an SSVC action — the verdict an analyst acts on.</div>
+
+      <div class="scorebox">
+        <div class="sh">Four dimensions → one verdict</div>
+        <div class="dims">
+          <div class="dimc"><div class="dn">Likelihood <span class="mx">≤5</span></div><div class="db"><i style="width:80%;background:var(--crit)"></i></div><div class="df">KEV · exploited · actor · freshness</div></div>
+          <div class="dimc"><div class="dn">Impact <span class="mx">≤5</span></div><div class="db"><i style="width:80%;background:var(--high)"></i></div><div class="df">CVSS · asset criticality · data sensitivity</div></div>
+          <div class="dimc"><div class="dn">Exposure <span class="mx">≤3</span></div><div class="db"><i style="width:66%;background:var(--med)"></i></div><div class="df">internet-facing · identity · reachability</div></div>
+          <div class="dimc"><div class="dn">Confidence <span class="mx">≤4</span></div><div class="db"><i style="width:75%;background:var(--accent)"></i></div><div class="df">source trust · TLP (parallel label)</div></div>
+        </div>
+        <div class="formula">
+          <span>risk</span><span class="op">=</span><span>(L <span class="op">×</span> I <span class="op">×</span> E)</span><span class="op">/</span><span>75</span>
+          <span class="arrow-r">→</span><span class="out">severity</span><span class="arrow-r">→</span><span class="out">SSVC action</span>
+        </div>
+        <div class="sevpills">
+          <span class="sp act">Act</span><span class="sp attend">Attend</span><span class="sp track">Track</span>
+        </div>
+      </div>
+      <span class="more">details →</span>
+    </div>
+
+    <div class="flow" style="height:26px"><div class="rail"></div><div class="cap"></div></div>
+
+    <div class="node" style="--nc:var(--score)" data-node="alert">
+      <div class="nt"><span class="ico" style="--nc:var(--score)"><svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path d="M12 3a6 6 0 00-6 6c0 5-2 6-2 6h16s-2-1-2-6a6 6 0 00-6-6zM10 20a2 2 0 004 0" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h3>Alert</h3></div>
+      <div class="file">internal/risk/alert.go</div>
+      <div class="desc">Wraps the scored match with a dedup identity and a status lifecycle (<span class="mono">new → acked → false_pos / resolved</span>), persisted with a rolling TTL.</div>
+      <div class="tags"><span class="tag">dedup hash</span><span class="tag">status lifecycle</span><span class="tag mono">TTL 7d</span></div>
+      <span class="more">details →</span>
+    </div>
+  </div>
+
+  <div class="flow"><div class="rail"></div><div class="cap"></div></div>
+
+  <!-- ── 5 · PERSIST ── -->
+  <div class="band">
+    <div class="band-label" style="--bl:var(--persist)"><span class="band-num" style="--bl:var(--persist)">5</span><span class="band-name" style="--bl:var(--persist)">Persist</span><span class="band-desc">one embedded file, zero external services</span></div>
+    <div class="node" style="--nc:var(--persist)" data-node="store">
+      <div class="nt"><span class="ico" style="--nc:var(--persist)"><svg fill="none" viewBox="0 0 24 24" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span><h3>SQLite store</h3></div>
+      <div class="file">internal/store — modernc pure-Go driver (no cgo)</div>
+      <div class="desc">Single embedded database for the whole system. WAL mode, single writer.</div>
+      <div class="tags"><span class="tag mono">events</span><span class="tag mono">alerts</span><span class="tag mono">techstack</span><span class="tag mono">users</span><span class="tag mono">sessions</span><span class="tag mono">cursor</span></div>
+      <span class="more">details →</span>
+    </div>
+  </div>
+
+  <div class="flow"><div class="rail"></div><div class="cap"></div></div>
+
+  <!-- ── 6 · RESPOND & PRESENT ── -->
+  <div class="band">
+    <div class="band-label" style="--bl:var(--respond)"><span class="band-num" style="--bl:var(--respond)">6</span><span class="band-name" style="--bl:var(--respond)">Respond &amp; present</span><span class="band-desc">route to humans and controls; serve the triage console</span></div>
+    <div class="split">
+      <!-- respond -->
+      <div>
+        <div class="col-h" style="color:var(--respond)"><span class="swatch" style="background:var(--respond)"></span> Respond</div>
+        <div class="node" style="--nc:var(--respond)" data-node="router">
+          <div class="nt"><span class="ico" style="--nc:var(--respond)"><svg fill="none" viewBox="0 0 24 24" stroke-width="2"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><path d="M7 12h5m0 0l5-6m-5 6l5 6" stroke-linecap="round"/></svg></span><h3>Notification router</h3></div>
+          <div class="file">internal/notify/router.go</div>
+          <div class="desc">Rules match on severity + confidence, then fan out to the right channels.</div>
+          <div class="fanout">
+            <div class="sink" data-node="chat"><span class="sd" style="background:var(--respond)"></span><span class="sn">Chat webhooks</span><span class="sm">slack · teams</span></div>
+            <div class="sink" data-node="email"><span class="sd" style="background:var(--respond)"></span><span class="sn">Email</span><span class="sm">email.go</span></div>
+            <div class="sink" data-node="console"><span class="sd" style="background:var(--respond)"></span><span class="sn">Console</span><span class="sm">stdout</span></div>
+            <div class="sink" data-node="edr" style="border-color:rgba(53,207,143,0.35)"><span class="sd" style="background:var(--ok)"></span><span class="sn">CrowdStrike EDR</span><span class="guard">GUARDRAILS</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- present -->
+      <div>
+        <div class="col-h" style="color:var(--present)"><span class="swatch" style="background:var(--present)"></span> Present</div>
+        <div class="node" style="--nc:var(--present);height:calc(100% - 29px)" data-node="api">
+          <div class="nt"><span class="ico" style="--nc:var(--present)"><svg fill="none" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 14h6" stroke-linecap="round"/></svg></span><h3>API + Triage console</h3></div>
+          <div class="file">internal/api — HTTP server + SPA dashboard</div>
+          <div class="desc">REST endpoints (<span class="mono">/api/alerts</span>, <span class="mono">/api/techstack</span>, <span class="mono">/api/status</span>) and the single-file dashboard where analysts triage by SSVC action, manage the tech stack, and configure routing.</div>
+          <div class="tags"><span class="tag mono">/api/alerts</span><span class="tag">action-led queue</span><span class="tag">keyboard triage</span></div>
+          <div class="dashnote">reads alerts &amp; tech stack from SQLite ↑</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CROSS-CUTTING ── -->
+  <div class="band" style="margin-top:26px">
+    <div class="band-label"><span class="band-num">×</span><span class="band-name">Cross-cutting</span><span class="band-desc">spans every layer</span></div>
+    <div class="xrow">
+      <div class="xc" data-node="auth"><h4>Authentication</h4><p>Argon2id passwords · hashed sessions · login rate-limit · <span class="mono">X-Arbiter-Key</span> · dashboard escaping</p></div>
+      <div class="xc" data-node="config"><h4>Configuration</h4><p>Env vars + YAML risk weights. Thresholds and routing rules are tunable without a rebuild.</p></div>
+      <div class="xc" data-node="runtime"><h4>Runtime</h4><p>One static binary. No external services beyond the SQLite file — deploy by copying and setting a few env vars.</p></div>
+      <div class="xc" data-node="obs"><h4>Health &amp; status</h4><p>Public <span class="mono">/health</span> liveness; authenticated <span class="mono">/api/status</span> exposes source connectivity and counts.</p></div>
+    </div>
+  </div>
+
+  <footer>
+    <span class="mono">MISP + CISA KEV</span> → normalize → match to org → score (L·I·E) → severity + SSVC action → route to humans &amp; EDR → triage.<br>
+    Every block above maps to a real package. Single Go binary · SQLite · pull-all / filter-local · safe-by-default EDR export.
+  </footer>
+</div>
+
+<!-- detail drawer -->
+<div class="scrim" id="scrim" onclick="closeD()"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+
+<script>
+const NODES = {
+  misp:{band:"Ingest",bc:"var(--ingest)",title:"MISP feed",file:"internal/source/misp.go · poller.go",
+    resp:["Polls the MISP <code>restSearch</code> API on an incremental timestamp cursor; cold start reaches back 7 days.","Pages through results (batches of 100) so large instances aren't truncated.","Normalizes each attribute into the canonical model: CVEs, IOCs (ipv4/ipv6/domain/sha256/md5), tags, and threat-actor galaxy clusters.","Extracts the event's TLP marking to drive both filtering and export policy."],
+    dec:["<b>Pull-all, filter-local:</b> pulls every changed event and decides relevance locally, so a threat that hits your stack via an untracked actor isn't missed by a server-side filter."],
+    cav:["In-memory cursor advance means very high change volume must be paged fully or the cursor should resume from the last processed timestamp."]},
+  kev:{band:"Ingest",bc:"var(--ingest)",title:"CISA KEV",file:"internal/source/kev.go",
+    resp:["Ingests CISA's Known Exploited Vulnerabilities catalog.","Marks matching CVEs as actively exploited in the wild."],
+    dec:["KEV is the strongest single <b>likelihood</b> signal — it means exploitation is confirmed, not predicted."],
+    cav:["KEV lags real exploitation; pairing it with EPSS would strengthen likelihood for not-yet-listed CVEs."]},
+  model:{band:"Normalize",bc:"var(--normalize)",title:"Canonical Threat Event",file:"internal/model/threat_event.go",
+    resp:["Defines the single type every downstream component reads: Source, SourceConfidence, Title, Description, CVEs[], Tags[], IOCs[], ThreatActors[], References[], Published.","IOC sub-type carries Type / Value / Description / Source / Tags."],
+    dec:["<b>The most important architectural decision.</b> Because all sources normalize into one type, adding a source is a single normalizer and every stage after it is untouched. It's also what makes matching, scoring, and EDR export source-agnostic."],
+    cav:[]},
+  queue:{band:"Buffer",bc:"var(--normalize)",title:"Event queue",file:"cmd/arbiter/main.go",
+    resp:["An in-memory Go channel buffers normalized events between the pollers and the scoring pipeline.","A single consumer goroutine runs filter → match → score → persist → route in order."],
+    dec:["Decoupling means a slow scoring pass applies backpressure to ingestion instead of dropping data."],
+    cav:["The queue is in-memory; durability relies on the source cursor re-pulling on restart, so the cursor must commit only after events are safely processed."]},
+  orgctx:{band:"Correlate & score",bc:"var(--cyan)",title:"Org context (CMDB / tech stack)",file:"internal/store · dashboard CSV import",
+    resp:["Holds the org's applications: name, version, vendor, category, criticality, owner team, internet-facing, hosts, data sensitivity.","Imported by CSV from a CMDB or edited in the dashboard."],
+    dec:["This is what turns generic intel into <em>your</em> priorities — the context that CVSS alone can't provide."],
+    cav:["It's the load-bearing input: stale or version-less CMDB data forces conservative product-only matches and drives over-alerting. Value is capped by CMDB hygiene."]},
+  filter:{band:"Correlate & score",bc:"var(--score)",title:"Filter",file:"internal/filter",
+    resp:["Applies the TLP gate — drops <code>tlp:red</code> events from processing.","Runs cheap relevance pre-checks before the more expensive match stage."],
+    dec:["Filtering early keeps the hot path cheap without losing the pull-all guarantee."],cav:[]},
+  match:{band:"Correlate & score",bc:"var(--score)",title:"Match engine",file:"internal/match · internal/match/version",
+    resp:["Correlates event CVEs against the org tech stack.","Compares versions where available; falls back to a conservative product-only match when versions are missing.","Exposes a pluggable <code>Matcher</code> interface so new match strategies drop in."],
+    dec:["Product-only fallback errs toward flagging rather than missing — deliberately conservative."],
+    cav:["Missing CMDB versions collapse everything to product-only matches, which inflates alert volume."]},
+  risk:{band:"Correlate & score",bc:"var(--score)",title:"Risk engine",file:"internal/risk/engine.go",
+    resp:["<b>Likelihood (≤5):</b> KEV / exploited / threat-actor / freshness.","<b>Impact (≤5):</b> CVSS + asset criticality + data sensitivity.","<b>Exposure (≤3):</b> internet-facing, identity, reachability.","<b>Confidence (≤4):</b> source trust and TLP, carried as a parallel label, not folded into the score.","Combines L·I·E into a normalized <code>risk</code> score, maps to a severity band, and emits an SSVC action (Act / Attend / Track)."],
+    dec:["Separating severity (how bad) from confidence (how sure) means a high-severity, low-confidence item is visible rather than hidden.","Baseline floors keep a matched internal-only threat from collapsing to zero, so a critical internal RCE can't score as low."],
+    cav:["Internal exposure is capped, so internal-only threats top out at 'high' — a deliberate default worth revisiting for crown-jewel assets."]},
+  alert:{band:"Correlate & score",bc:"var(--score)",title:"Alert",file:"internal/risk/alert.go",
+    resp:["Wraps the scored match into an alert with a dedup identity.","Tracks a status lifecycle: new → acked → false_pos / resolved.","Persists with a rolling TTL (7 days)."],
+    dec:["Dedup keeps the queue quiet when the same event is re-seen or modified."],cav:[]},
+  store:{band:"Persist",bc:"var(--persist)",title:"SQLite store",file:"internal/store — modernc pure-Go driver",
+    resp:["Single embedded database for events, alerts, tech stack, users, sessions, and the source cursor.","Pure-Go driver means no cgo and no external database process."],
+    dec:["One file, WAL mode, single writer — the whole 'deploy by copying a binary' story depends on this."],
+    cav:["The DB is effectively a map of your vulnerabilities — protect the file; consider at-rest protection."]},
+  router:{band:"Respond",bc:"var(--respond)",title:"Notification router",file:"internal/notify/router.go",
+    resp:["Evaluates routing rules against each alert's severity and confidence.","Dispatches to the matching channels; a single alert can fan out to several."],
+    dec:["Rules live in config, so routing changes don't need a rebuild."],cav:[]},
+  chat:{band:"Respond",bc:"var(--respond)",title:"Chat webhooks (Slack / Teams)",file:"internal/notify/slack.go",
+    resp:["Posts alert summaries to Slack/Teams incoming webhooks."],
+    dec:["Webhook URLs are secrets — kept server-side, not in the browser."],cav:[]},
+  email:{band:"Respond",bc:"var(--respond)",title:"Email",file:"internal/notify/email.go",
+    resp:["Sends alert notifications over SMTP."],dec:[],cav:[]},
+  console:{band:"Respond",bc:"var(--respond)",title:"Console",file:"internal/notify",
+    resp:["Writes alerts to stdout — the zero-config default sink and useful for piping to a log collector."],dec:[],cav:[]},
+  edr:{band:"Respond",bc:"var(--ok)",title:"CrowdStrike Falcon EDR",file:"internal/notify/crowdstrike.go",
+    resp:["Pushes validated IOCs into Falcon's custom-IOC API via OAuth2, batched (100 / 30s) and deduplicated.","Turns curated intel into active endpoint response."],
+    dec:["<b>Safe-by-default guardrails:</b> IOC validation + refang, private-IP and public-resolver/CDN denylist, TLP export boundary, and a prevent-gate that keeps action at <code>detect</code> unless an operator explicitly approves IOC types.","Graceful drain on shutdown; single-flight token refresh off the hot path."],
+    cav:["<code>prevent</code> mode blocks fleet-wide — org-owned infrastructure should be added to the never-block allowlist before enabling it."]},
+  api:{band:"Present",bc:"var(--present)",title:"API + Triage console",file:"internal/api",
+    resp:["Serves REST endpoints: <code>/api/alerts</code>, <code>/api/techstack</code>, <code>/api/status</code>.","Serves the single-file dashboard — an action-led triage queue, tech-stack management, and routing settings.","Reads alerts and context back from SQLite."],
+    dec:["The queue leads with the SSVC action and surfaces the risk breakdown, so analysts triage without opening every item."],cav:[]},
+  auth:{band:"Cross-cutting",bc:"var(--accent)",title:"Authentication & session security",file:"internal/api/auth.go",
+    resp:["Argon2id password hashing with transparent upgrade from any legacy hashes.","Session tokens hashed at rest; login rate-limiting; random first-boot admin password.","<code>X-Arbiter-Key</code> for programmatic access; dashboard output is escaped against feed-driven XSS."],dec:[],cav:[]},
+  config:{band:"Cross-cutting",bc:"var(--accent)",title:"Configuration",file:"internal/config",
+    resp:["Environment variables plus YAML risk weights and routing rules.","Scoring thresholds and channel routing are tunable without recompiling."],dec:[],cav:[]},
+  runtime:{band:"Cross-cutting",bc:"var(--accent)",title:"Runtime & deployment",file:"cmd/arbiter",
+    resp:["Compiles to one static Go binary with no cgo.","No dependencies beyond the SQLite file — copy the binary, set a few env vars, run."],dec:[],cav:[]},
+  obs:{band:"Cross-cutting",bc:"var(--accent)",title:"Health & status",file:"internal/api/server.go",
+    resp:["Public <code>/health</code> returns liveness only.","Authenticated <code>/api/status</code> exposes source connectivity, KEV counts, and alert totals."],dec:[],cav:[]},
+};
+
+function drawer(id){
+  const n=NODES[id]; if(!n) return;
+  const sec=(title,items,cls)=> items&&items.length? `<div class="dsec ${cls||''}"><h4>${title}</h4><ul>${items.map(i=>`<li>${i}</li>`).join("")}</ul></div>`:"";
+  document.getElementById("drawer").innerHTML=`
+    <div class="dhead">
+      <button class="close" onclick="closeD()">✕</button>
+      <div class="lbl" style="color:${n.bc}">${n.band}</div>
+      <h2>${n.title}</h2>
+      <div class="file">${n.file}</div>
+    </div>
+    <div class="dbody">
+      ${sec("Responsibilities",n.resp)}
+      ${sec("Design decisions",n.dec)}
+      ${sec("Trade-offs &amp; caveats",n.cav,"caveat")}
+    </div>`;
+  document.getElementById("drawer").classList.add("on");
+  document.getElementById("drawer").setAttribute("aria-hidden","false");
+  document.getElementById("scrim").classList.add("on");
+}
+function closeD(){
+  document.getElementById("drawer").classList.remove("on");
+  document.getElementById("scrim").classList.remove("on");
+  document.getElementById("drawer").setAttribute("aria-hidden","true");
+}
+document.querySelectorAll("[data-node]").forEach(el=>{
+  el.addEventListener("click",e=>{e.stopPropagation();drawer(el.getAttribute("data-node"));});
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeD();});
+</script>
 </body>
 </html>
