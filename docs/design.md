@@ -472,6 +472,33 @@ confidence_label (from Confidence dimension):
 
 **Calibration via feedback loop:** When an analyst marks an alert as `false_pos`, the system records the event's full risk state (all dimension scores, source, matcher, match_confidence). After sufficient data, operators can analyze patterns ("CVEMatcher with product_only_match over-alerts on medium severity") and adjust weights in `risk.yaml`.
 
+#### Exposure Ceiling for Internal-Only Assets
+
+The risk scoring formula `(L × I × E) / (5 × 5 × 3)` caps exposure at 1 for internal-only assets (not internet-facing, no credential exposure). This means:
+
+```
+Max score: (5 × 5 × 1) / 75 = 25/75 ≈ 0.33
+```
+
+An internal asset can reach **high** severity (≥0.25) but can never reach **critical** (≥0.50). A domain controller or internal CA with an actively-exploited, KEV-listed, CVSS-9.8 RCE would score as "high" — not "critical."
+
+**For most assets, this is correct.** An internal-only threat has no direct internet exposure — the attacker must already be inside the network. The threat is real but the blast radius is smaller than an internet-facing RCE.
+
+**For critical internal infrastructure — maybe not.** A domain controller, internal Certificate Authority, or secrets management server might warrant critical severity even without internet exposure because compromise of these assets provides lateral movement to everything else.
+
+**Recommendation:** Make the exposure floor configurable per-asset via the `criticality` field:
+
+| Criticality | Exposure floor |
+|---|---|
+| `low` | 1 (current default) |
+| `medium` | 1 |
+| `high` | 2 |
+| `critical` | 3 (allows reaching critical severity) |
+
+If asset `criticality = critical` AND exposure would be 1, raise the floor to 3. A domain controller with an active RCE would then score `(5 × 5 × 3) / 75 = 75/75 = 1.0 → critical`.
+
+This is a product decision, not a bug. The current behavior is defensible for most deployments. The configurable per-asset approach requires changes to `internal/risk/engine.go`, `internal/config/risk.yaml`, and the tech stack model. Implementation should be opt-in and backward-compatible.
+
 ### 7. Explainability Engine
 
 Every alert carries a human-readable explanation built from the risk engine's internal state. The formula used in the explanation must match the actual scoring formula exactly.
