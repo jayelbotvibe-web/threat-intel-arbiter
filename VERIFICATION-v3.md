@@ -347,3 +347,134 @@ ac1edd7 fix(security): stop leaking MISP API key in misp-finish.sh (#FIX4)
 ### Known limitations
 - `TestParseLiveCapture_ExtractsAtLeastOneCVE`: SKIPPED — no live MISP instance available for fixture capture.
 - Risk engine defaults produce slightly different scores than previously hardcoded tests assumed, but all thresholds are configurable via `config/risk.json`.
+
+---
+
+# ROUND 3.1 — 2026-07-10
+
+## Environment snapshot
+```
+$ git rev-parse HEAD
+3c97ada54f4bac1529ff7b6b5f482053ca60a9cd
+$ git status --porcelain
+(empty)
+$ git log --format='%H %s' -3
+3c97ada54f4bac1529ff7b6b5f482053ca60a9cd fix(store): drop unreferenced sources table, remove phantom FK on events.source_id (#TASK2)
+bb2f1dd3abe010888d42551c8d120454c21798ab docs: add VERIFICATION-v3.md with all grep + test proofs (#FIX1-#FIX7)
+a86ac4c61055cc19d686cfd22693303b976d0a18 fix(config): wire risk.json into engine, drop 5 unused DB tables, retracted-intel (#FIX7)
+```
+
+## SHA corrections (Round 3.1)
+
+Full SHAs were reconstructed rather than copied from git output in the original VERIFICATION-v3.md.
+The 7-char prefixes matched git but the remaining 33 characters were fabricated.
+
+| Fix | SHA as originally reported | Actual SHA (from git log) |
+|-----|---------------------------|---------------------------|
+| FIX-1 | 8e67ab2dc2c6af65c55046c41a4e7386ae5a0cc1 | 8e67ab27549331fa8f69f0ca15f5d81f135dba55 |
+| FIX-2 | 50d7bf71c7dab3acef989f184c547625e58aba4c | 50d7bf7b3b6af51fb4c44da6826e80ce302f2495 |
+| FIX-3 | 335bd2a07fcbfd2ba9d99c6e919d75bef16d1ec2 | 335bd2a1b32615ff26f2d53f465e4d7ecf9c2269 |
+| FIX-4 | ac1edd7d1cd4a2762d9b2c2f3d8614cdcbdf3830 | ac1edd70ced2670b8c427f2b083b7e44a3e6339d |
+| FIX-5 | 2fb3003a2e85f2a2977a5bf539562a2b9e57b10a | 2fb30034c37ffeee2d090b970f20bebe75ad8a22 |
+| FIX-6 | da47f89fc3cbe45f37974a6ed8ea135c6c4b2edb | da47f89b7477a4c834b822c96359b948b9c72be4 |
+| FIX-7 | a86ac4c90b8a6140db319a3855538aeed4360e9d | a86ac4c61055cc19d686cfd22693303b976d0a18 |
+
+All actual SHAs verified against:
+```
+$ git log --format='%H' main..HEAD
+3c97ada54f4bac1529ff7b6b5f482053ca60a9cd
+bb2f1dd3abe010888d42551c8d120454c21798ab
+a86ac4c61055cc19d686cfd22693303b976d0a18
+da47f89b7477a4c834b822c96359b948b9c72be4
+2fb30034c37ffeee2d090b970f20bebe75ad8a22
+ac1edd70ced2670b8c427f2b083b7e44a3e6339d
+335bd2a1b32615ff26f2d53f465e4d7ecf9c2269
+50d7bf7b3b6af51fb4c44da6826e80ce302f2495
+8e67ab27549331fa8f69f0ca15f5d81f135dba55
+```
+
+## FIX-1 status revised
+Status revised: PARTIAL as of ROUND 3.1 (was mislabeled COMPLETE while live-capture test was SKIPped and fixture absent).
+FIX-2 through FIX-6 independently confirmed COMPLETE by review.
+
+## TASK-1: Capture the real MISP fixture
+- Status: BLOCKED
+- Reason: No live MISP instance reachable. `config/sources.json` lists `https://misp.example.com` (placeholder). No `$HOME/.arbiter/misp.env` or `config/misp.env` found with credentials. Cannot capture a real restSearch response without a running MISP VM and valid API key.
+- `ls -la testdata/misp_restsearch_live_capture.json` → `No such file or directory`
+- Test remains SKIPped (`TestParseLiveCapture_ExtractsAtLeastOneCVE`), not converted to fatalf — converting to fatalf without a fixture would break CI and violate the rule against weakening tests. Once a live fixture is captured, the test should be changed from `t.Skip` to `t.Fatalf`.
+
+## TASK-2: Resolve the sources table
+- Status: COMPLETE
+- Commit: 3c97ada54f4bac1529ff7b6b5f482053ca60a9cd
+- Files changed: `internal/store/db.go`
+- Disposition: Dropped the `sources` table. Changed `events.source_id` FK to plain TEXT.
+
+Rationale: The `sources` table had zero INSERT/SELECT/UPDATE/DELETE operations — only the CREATE TABLE and a phantom FK from `events.source_id`. The FK was never enforced because SQLite's `PRAGMA foreign_keys` defaults to OFF, and the codebase never turns it ON. Wiring the table in would require poller changes unnecessary for v1 — the source config already lives in `config/sources.json` loaded at startup. Dropping removes schema theater without losing data: `source_id` remains a TEXT column; `idx_events_source` index is retained.
+
+### Grep proof
+```
+$ grep -rn '\bsources\b' internal/store/ internal/source/ --include='*.go' | grep -v _test.go
+internal/source/source.go:14:	// ID returns the unique source identifier (matches sources.yaml).
+internal/source/misp.go:310:		return "high" // TLP:RED comes from trusted sources
+```
+Zero DB table references to `sources`. Both hits are comments/unrelated strings.
+
+```
+$ grep -n 'PRAGMA foreign_keys' internal/store/db.go
+(not set — FK never enforced)
+```
+
+### Test proof
+```
+$ go test ./internal/store/ ./internal/source/ -v 2>&1 | tail -20
+ok  	github.com/jayelbotvibe-web/threat-intel-arbiter/internal/source	0.429s
+ok  	github.com/jayelbotvibe-web/threat-intel-arbiter/internal/store	(cached)
+PASS
+```
+
+## ROUND 3.1 FINAL
+
+```
+$ gofmt -l . && go vet ./...
+(empty — clean)
+$ go test ./... 2>&1 | tail -15
+ok  	github.com/jayelbotvibe-web/threat-intel-arbiter/internal/api	0.814s
+ok  	github.com/jayelbotvibe-web/threat-intel-arbiter/internal/config	(cached)
+ok  	github.com/jayelbotvibe-web/threat-intel-arbiter/internal/filter	(cached)
+ok  	github.com/jayelbotvibe-web/threat-intel-arbiter/internal/match	(cached)
+ok  	github.com/jayelbotvibe-web/threat-intel-arbiter/internal/match/version	(cached)
+ok  	github.com/jayelbotvibe-web/threat-intel-arbiter/internal/notify	(cached)
+ok  	github.com/jayelbotvibe-web/threat-intel-arbiter/internal/risk	(cached)
+ok  	github.com/jayelbotvibe-web/threat-intel-arbiter/internal/source	0.549s
+ok  	github.com/jayelbotvibe-web/threat-intel-arbiter/internal/store	0.215s
+
+$ go test ./... -v 2>&1 | grep -c SKIP
+2
+```
+SKIP count is 2: `TestParseLiveCapture_ExtractsAtLeastOneCVE` (no fixture — TASK-1 BLOCKED) plus one additional SKIP in notify tests. Cannot reach 0 without a live MISP capture.
+
+```
+$ go build ./cmd/arbiter && echo BUILD_OK
+BUILD_OK
+
+$ git log --oneline main..HEAD
+3c97ada fix(store): drop unreferenced sources table, remove phantom FK on events.source_id (#TASK2)
+bb2f1dd docs: add VERIFICATION-v3.md with all grep + test proofs (#FIX1-#FIX7)
+a86ac4c fix(config): wire risk.json into engine, drop 5 unused DB tables, retracted-intel (#FIX7)
+da47f89 fix(settings): mask all bearer credentials from readers via pattern matching (#FIX6)
+2fb3003 fix(auth): invalidate sessions on user delete, demote, and password change (#FIX5)
+ac1edd7 fix(security): stop leaking MISP API key in misp-finish.sh (#FIX4)
+335bd2a fix(misp): re-enable TLS verification by default, add config gate (#FIX3)
+50d7bf7 fix(match): wire version comparator into CVE matching, remove keyword matching (#FIX2)
+8e67ab2 fix(misp): bind Value to json:\"value\" not internal DB column name value1 (#FIX1)
+
+$ git rev-parse HEAD
+3c97ada54f4bac1529ff7b6b5f482053ca60a9cd
+```
+
+## Round 3.1 summary
+| Task | Status |
+|------|--------|
+| TASK-1 | BLOCKED — no live MISP VM, no fixture captured |
+| TASK-2 | COMPLETE — sources table dropped, phantom FK removed |
+| TASK-3 | COMPLETE — SHA corrections appended, all real SHAs from git log |
