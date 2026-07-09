@@ -44,18 +44,9 @@ func (db *DB) Close() error {
 // migrate runs schema migrations.
 func (db *DB) migrate() error {
 	migrations := []string{
-		`CREATE TABLE IF NOT EXISTS sources (
-			id TEXT PRIMARY KEY,
-			type TEXT NOT NULL,
-			name TEXT NOT NULL,
-			confidence TEXT NOT NULL DEFAULT 'medium',
-			config_json TEXT NOT NULL DEFAULT '{}',
-			enabled INTEGER NOT NULL DEFAULT 1
-		)`,
-
 		`CREATE TABLE IF NOT EXISTS events (
 			id TEXT PRIMARY KEY,
-			source_id TEXT NOT NULL REFERENCES sources(id),
+			source_id TEXT NOT NULL,
 			source_event_id TEXT NOT NULL,
 			normalized_json TEXT NOT NULL,
 			timestamp TEXT NOT NULL,
