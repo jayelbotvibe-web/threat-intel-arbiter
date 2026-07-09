@@ -5,6 +5,10 @@ tmp/
 # Database
 data/*.db
 
+# Secrets (never commit)
+*.env
+config/misp.env
+
 # IDE
 .idea/
 .vscode/
