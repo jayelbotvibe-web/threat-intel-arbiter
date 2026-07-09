@@ -141,7 +141,7 @@ func main() {
 	matchEngine := match.NewEngine(matchers...)
 	log.Printf("match engine ready: %d matchers (%v)", len(matchers), matchEngine.MatcherNames())
 
-	riskEngine := risk.NewEngine()
+	riskEngine := risk.NewEngineWithConfig(cfg.Risk)
 
 	// Build router from routing.yaml
 	var rules []notify.Rule

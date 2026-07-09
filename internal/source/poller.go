@@ -94,8 +94,10 @@ func (p *MISPPoller) poll(ctx context.Context) error {
 			}
 
 			if existing != nil && raw.Published == false {
-				log.Printf("misp poller: event %s deleted, suppressing", normalized.ID)
+				log.Printf("misp poller: event %s deleted, suppressing alerts", normalized.ID)
 				p.storeEvent(normalized, true)
+				// Suppress any existing alerts derived from this event
+				p.DB.SuppressAlertsForEvent(normalized.ID)
 				continue
 			}
 
