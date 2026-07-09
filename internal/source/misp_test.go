@@ -546,7 +546,7 @@ func TestParseLiveCapture_ExtractsAtLeastOneCVE(t *testing.T) {
 	fixtures := loadFixtures(t, "")
 	data, ok := fixtures["misp_restsearch_live_capture.json"]
 	if !ok {
-		t.Skip("SKIPPED: no live capture fixture at testdata/misp_restsearch_live_capture.json — capture one with curl against a live MISP instance")
+		t.Fatalf("FATAL: live capture fixture missing at testdata/misp_restsearch_live_capture.json — run TASK-B from ROUND 3.2")
 	}
 
 	var wrapper struct {
