@@ -20,8 +20,8 @@ type Rule struct {
 
 // Router matches alerts to notification channels based on routing rules.
 type Router struct {
-	Rules      []Rule
-	Notifiers  map[string]Notifier
+	Rules     []Rule
+	Notifiers map[string]Notifier
 }
 
 // Notifier sends an alert to a specific channel.
@@ -89,8 +89,8 @@ func containsAny(list []string, s string) bool {
 
 // ConsoleNotifier prints alerts to stdout with ANSI colors.
 type ConsoleNotifier struct {
-	name  string
-	out   *os.File
+	name string
+	out  *os.File
 }
 
 // NewConsoleNotifier creates a notifier that prints to stdout.

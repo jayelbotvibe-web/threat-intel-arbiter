@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"testing"
 	"time"
@@ -84,8 +85,8 @@ func loadFixtures(t *testing.T, relativeDir string) map[string]json.RawMessage {
 
 	// Try relative to project root (works with go test ./internal/source/)
 	candidates := []string{
-		filepath.Join("..", "..", "testdata"),     // from internal/source/
-		filepath.Join("testdata"),                   // from project root
+		filepath.Join("..", "..", "testdata"), // from internal/source/
+		filepath.Join("testdata"),             // from project root
 	}
 
 	// Also try absolute path from the source file
@@ -133,7 +134,7 @@ func TestMISPClientFetchEvents(t *testing.T) {
 	srv := fixtureServer(t)
 	defer srv.Close()
 
-	client := NewMISPClient(srv.URL, "test-api-key")
+	client := NewMISPClient(srv.URL, "test-api-key", false, "")
 	events, err := client.FetchEvents("", 100, 0)
 	if err != nil {
 		t.Fatalf("FetchEvents: %v", err)
@@ -282,7 +283,7 @@ func TestMISPPoller_FirstRun(t *testing.T) {
 
 	events := make(chan model.ThreatEvent, 100)
 	poller := &MISPPoller{
-		Client:    NewMISPClient(srv.URL, "test-api-key"),
+		Client:    NewMISPClient(srv.URL, "test-api-key", false, ""),
 		DB:        db,
 		Events:    events,
 		Interval:  15 * time.Minute,
@@ -342,7 +343,7 @@ func TestMISPPoller_SecondRun_NoColdStart(t *testing.T) {
 
 	events := make(chan model.ThreatEvent, 100)
 	poller := &MISPPoller{
-		Client:    NewMISPClient(srv.URL, "test-api-key"),
+		Client:    NewMISPClient(srv.URL, "test-api-key", false, ""),
 		DB:        db,
 		Events:    events,
 		Interval:  15 * time.Minute,
@@ -395,7 +396,7 @@ func TestMISPPoller_CursorPersistsAcrossRestart(t *testing.T) {
 
 	events := make(chan model.ThreatEvent, 100)
 	poller := &MISPPoller{
-		Client:    NewMISPClient(srv.URL, "test-api-key"),
+		Client:    NewMISPClient(srv.URL, "test-api-key", false, ""),
 		DB:        db,
 		Events:    events,
 		Interval:  15 * time.Minute,
@@ -422,7 +423,7 @@ func TestMISPPoller_CursorPersistsAcrossRestart(t *testing.T) {
 
 	events2 := make(chan model.ThreatEvent, 100)
 	poller2 := &MISPPoller{
-		Client:    NewMISPClient(srv.URL, "test-api-key"),
+		Client:    NewMISPClient(srv.URL, "test-api-key", false, ""),
 		DB:        db2,
 		Events:    events2,
 		Interval:  15 * time.Minute,
@@ -453,10 +454,124 @@ func TestMISPClient_AuthFailure(t *testing.T) {
 	defer srv.Close()
 
 	// Client with no API key
-	client := NewMISPClient(srv.URL, "")
+	client := NewMISPClient(srv.URL, "", false, "")
 	_, err := client.FetchEvents("", 10, 0)
 	if err == nil {
 		t.Error("expected auth error, got nil")
 	}
 	t.Logf("auth error (expected): %v", err)
+}
+
+// TestTLSVerifyDefaultOn verifies that TLS verification is enabled by default
+// (no InsecureSkipVerify when tlsSkipVerify is false).
+func TestTLSVerifyDefaultOn(t *testing.T) {
+	// Create client with default (secure) settings
+	client := NewMISPClient("https://example.com", "key", false, "")
+
+	transport, ok := client.HTTP.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	if transport.TLSClientConfig == nil {
+		t.Error("TLSClientConfig is nil — expected a config with verification enabled")
+	} else if transport.TLSClientConfig.InsecureSkipVerify {
+		t.Error("InsecureSkipVerify is true by default — should be false")
+	}
+	t.Log("TLS verification enabled by default (InsecureSkipVerify=false)")
+
+	// Verify that tlsSkipVerify=true does set InsecureSkipVerify
+	clientInsecure := NewMISPClient("https://example.com", "key", true, "")
+	transport2 := clientInsecure.HTTP.Transport.(*http.Transport)
+	if transport2.TLSClientConfig == nil || !transport2.TLSClientConfig.InsecureSkipVerify {
+		t.Error("InsecureSkipVerify should be true when tlsSkipVerify=true")
+	}
+	t.Log("TLS verification correctly disabled when tlsSkipVerify=true")
+}
+
+// TestParse_Value1KeyIsIgnored verifies that the old `value1` key no longer works.
+// This pins the correct binding: if someone reverts to `json:"value1"`, the
+// existing tests above (which use `value` in fixtures) will fail.
+func TestParse_Value1KeyIsIgnored(t *testing.T) {
+	// JSON using the OLD wrong key shape
+	oldShape := []byte(`{
+		"response": [{
+			"Event": {
+				"id": "1",
+				"uuid": "test-1",
+				"info": "Test event with value1 key",
+				"Attribute": [{
+					"id": "1",
+					"type": "vulnerability",
+					"category": "External analysis",
+					"value1": "CVE-2024-99999",
+					"comment": "test"
+				}]
+			}
+		}]
+	}`)
+
+	var resp MISPResponse
+	if err := json.Unmarshal(oldShape, &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Response) == 0 {
+		t.Fatal("no events parsed")
+	}
+
+	event := NormalizeMISPEvent(resp.Response[0].Event)
+
+	// The CVE in value1 should NOT be extracted because we bind to "value" now
+	for _, cve := range event.CVEs {
+		if cve == "CVE-2024-99999" {
+			t.Error("CVE from value1 key was incorrectly extracted — value1 binding still active")
+		}
+	}
+
+	// Verify the attribute value is indeed empty
+	if len(resp.Response[0].Event.Attributes) > 0 {
+		if resp.Response[0].Event.Attributes[0].Value != "" {
+			t.Errorf("expected empty Value from value1 key, got %q", resp.Response[0].Event.Attributes[0].Value)
+		}
+	}
+	t.Log("value1 key correctly ignored")
+}
+
+// TestParseLiveCapture_ExtractsAtLeastOneCVE verifies that a real MISP
+// restSearch response (live capture) parses and extracts CVEs.
+// Status: SKIPPED — no live MISP instance available in this session.
+// A live capture fixture must be placed at testdata/misp_restsearch_live_capture.json
+// before this test can pass.
+func TestParseLiveCapture_ExtractsAtLeastOneCVE(t *testing.T) {
+	// Try to load the live capture fixture
+	fixtures := loadFixtures(t, "")
+	data, ok := fixtures["misp_restsearch_live_capture.json"]
+	if !ok {
+		t.Fatalf("FATAL: live capture fixture missing at testdata/misp_restsearch_live_capture.json — run TASK-B from ROUND 3.2")
+	}
+
+	var wrapper struct {
+		Response []struct {
+			Event MISPEvent `json:"Event"`
+		} `json:"response"`
+	}
+	if err := json.Unmarshal(data, &wrapper); err != nil {
+		t.Fatalf("unmarshal live capture: %v", err)
+	}
+	if len(wrapper.Response) == 0 {
+		t.Fatal("live capture has no events")
+	}
+
+	cveCount := 0
+	for _, item := range wrapper.Response {
+		event := NormalizeMISPEvent(item.Event)
+		for _, cve := range event.CVEs {
+			if matched, _ := regexp.MatchString(`^CVE-\d{4}-\d+$`, cve); matched {
+				cveCount++
+			}
+		}
+	}
+	if cveCount == 0 {
+		t.Error("live capture contains zero extractable CVEs — check fixture or value binding")
+	}
+	t.Logf("extracted %d CVEs from live capture", cveCount)
 }

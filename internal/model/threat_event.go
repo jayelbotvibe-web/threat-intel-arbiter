@@ -43,7 +43,7 @@ type App struct {
 	InternetFacing  bool   `json:"internet_facing"`
 	Hosts           string `json:"hosts"`
 	DataSensitivity string `json:"data_sensitivity"` // "critical", "high", "medium", "low"
-	LastVerified    string `json:"last_verified"`     // ISO 8601 timestamp; empty if never verified
+	LastVerified    string `json:"last_verified"`    // ISO 8601 timestamp; empty if never verified
 }
 
 // OrgContext holds the organisation's profile for matching and scoring.
@@ -64,10 +64,12 @@ type Match struct {
 	AppName         string `json:"app_name,omitempty"`
 	AppVersion      string `json:"app_version,omitempty"`
 	VersionAffected bool   `json:"version_affected"`
-	MatchConfidence string `json:"match_confidence"` // "exact_version_match", "product_only_match", "unparseable_version"
+	MatchConfidence string `json:"match_confidence"` // "exact_version_match", "product_only_match", "weak_title_match", "unparseable_version"
 	SectorMatch     bool   `json:"sector_match"`
 	KEVMatch        bool   `json:"kev_match"`
 	Details         string `json:"details"`
+	Suppressed      bool   `json:"suppressed,omitempty"`
+	SuppressReason  string `json:"suppress_reason,omitempty"`
 }
 
 // Matcher is the interface implemented by all threat matchers.
@@ -82,7 +84,7 @@ type Alert struct {
 	EventID     string   `json:"event_id"`
 	Severity    string   `json:"severity"`
 	Confidence  string   `json:"confidence"`
-	Action      string   `json:"action"`       // SSVC v2.1: Act, Attend, Track*, Track
+	Action      string   `json:"action"` // SSVC v2.1: Act, Attend, Track*, Track
 	Explanation string   `json:"explanation"`
 	Status      string   `json:"status"`
 	MatchedApps []string `json:"matched_apps"`
@@ -103,10 +105,10 @@ const (
 
 // IOC represents an indicator of compromise extracted from a threat event.
 type IOC struct {
-	Type        IOCType `json:"type"`
-	Value       string  `json:"value"`
-	Description string  `json:"description"`
-	Severity    string  `json:"severity"`
-	Source      string  `json:"source"`
+	Type        IOCType  `json:"type"`
+	Value       string   `json:"value"`
+	Description string   `json:"description"`
+	Severity    string   `json:"severity"`
+	Source      string   `json:"source"`
 	Tags        []string `json:"tags,omitempty"`
 }

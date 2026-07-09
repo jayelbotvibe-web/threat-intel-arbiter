@@ -6,6 +6,7 @@ package store
 
 import (
 	"fmt"
+	"regexp"
 )
 
 // Setting keys used by the settings table.
@@ -19,11 +20,9 @@ const (
 	SettingAdminKeyMasked = "admin_key_masked"
 )
 
-// secretKeys is the set of keys whose values are masked in API responses.
-var secretKeys = map[string]bool{
-	SettingCSSecret:       true,
-	SettingAdminKeyMasked: true,
-}
+// secretKeyPattern matches setting keys whose values are always masked.
+// Covers webhook URLs, tokens, keys, secrets, passwords, and API keys.
+var secretKeyPattern = regexp.MustCompile(`(?i)(webhook|token|key|secret|password|api_key)`)
 
 // GetSetting reads a single setting value. Returns empty string if not found.
 func (db *DB) GetSetting(key string) (string, error) {
@@ -101,13 +100,19 @@ func (db *DB) SeedSetting(key, value string) error {
 	return db.SetSetting(key, value)
 }
 
+// isSecretKey returns true if the key name indicates a secret value
+// (webhook URLs, tokens, keys, secrets, passwords, API keys).
+func isSecretKey(key string) bool {
+	return secretKeyPattern.MatchString(key)
+}
+
 // maskValue returns a masked version for secret keys. Non-secret keys are
 // returned as-is. Empty values stay empty (nil mask reveals existence).
 func maskValue(key, value string) string {
 	if value == "" {
 		return ""
 	}
-	if secretKeys[key] {
+	if isSecretKey(key) {
 		if len(value) <= 4 {
 			return "****"
 		}

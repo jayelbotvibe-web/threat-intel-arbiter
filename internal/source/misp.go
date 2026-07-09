@@ -3,11 +3,14 @@ package source
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -17,20 +20,42 @@ import (
 // MISPClient is a REST client for the MISP threat intelligence platform.
 // It handles HMAC-SHA256 request signing as required by MISP's API.
 type MISPClient struct {
-	BaseURL  string
-	APIKey   string
-	HTTP     *http.Client
+	BaseURL string
+	APIKey  string
+	HTTP    *http.Client
 }
 
 // NewMISPClient creates a new MISP API client.
-func NewMISPClient(baseURL, apiKey string) *MISPClient {
+// tlsSkipVerify disables TLS certificate verification (lab use only — a WARN is logged).
+// caCertPath loads a custom CA certificate for self-signed lab MISPs.
+func NewMISPClient(baseURL, apiKey string, tlsSkipVerify bool, caCertPath string) *MISPClient {
+	tlsConfig := &tls.Config{}
+
+	if caCertPath != "" {
+		caCert, err := os.ReadFile(caCertPath)
+		if err != nil {
+			log.Printf("misp: WARNING — failed to read CA cert from %s: %v (falling back to system pool)", caCertPath, err)
+		} else {
+			pool := x509.NewCertPool()
+			if !pool.AppendCertsFromPEM(caCert) {
+				log.Printf("misp: WARNING — no certificates found in %s", caCertPath)
+			}
+			tlsConfig.RootCAs = pool
+		}
+	}
+
+	if tlsSkipVerify {
+		tlsConfig.InsecureSkipVerify = true
+		log.Printf("misp: WARNING — TLS certificate verification DISABLED — lab use only")
+	}
+
 	return &MISPClient{
 		BaseURL: strings.TrimRight(baseURL, "/"),
 		APIKey:  apiKey,
 		HTTP: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				TLSClientConfig: tlsConfig,
 			},
 		},
 	}
@@ -79,7 +104,7 @@ type MISPAttribute struct {
 	ID       string         `json:"id"`
 	Category string         `json:"category"`
 	Type     string         `json:"type"`
-	Value    string         `json:"value1"`
+	Value    string         `json:"value"`
 	Comment  string         `json:"comment"`
 	Tags     []MISPEventTag `json:"Tag"`
 }
@@ -100,12 +125,12 @@ type MISPGalaxyCluster struct {
 
 // MISPSighting is a sighting of an attribute by an organisation.
 type MISPSighting struct {
-	ID          string  `json:"id"`
-	AttributeID string  `json:"attribute_id"`
-	EventID     string  `json:"event_id"`
-	OrgID       string  `json:"org_id"`
-	DateSighting string `json:"date_sighting"`
-	Org         *MISPOrg `json:"Organisation"`
+	ID           string   `json:"id"`
+	AttributeID  string   `json:"attribute_id"`
+	EventID      string   `json:"event_id"`
+	OrgID        string   `json:"org_id"`
+	DateSighting string   `json:"date_sighting"`
+	Org          *MISPOrg `json:"Organisation"`
 }
 
 // MISPOrg is a MISP organisation reference.

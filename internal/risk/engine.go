@@ -8,19 +8,26 @@ package risk
 
 import (
 	"fmt"
-	"time"
 	"strings"
+	"time"
 
+	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/config"
 	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/model"
 )
 
-// Dimension max values (must match risk.yaml).
-const (
-	maxLikelihood  = 5
-	maxImpact      = 5
-	maxExposure    = 3
-	maxConfidence  = 4
-)
+// Engine computes risk scores for threat events.
+type Engine struct {
+	cfg RiskWeights
+}
+
+// RiskWeights holds the configurable risk scoring parameters.
+type RiskWeights struct {
+	MaxLikelihood      int
+	MaxImpact          int
+	MaxExposure        int
+	MaxConfidence      int
+	SeverityThresholds map[string]float64
+}
 
 // ScoreResult holds the output of the risk engine.
 type ScoreResult struct {
@@ -31,56 +38,79 @@ type ScoreResult struct {
 	RiskScore       float64 `json:"risk_score"`
 	Severity        string  `json:"severity"`
 	ConfidenceLabel string  `json:"confidence_label"`
-	Action          string  `json:"action"`     // SSVC v2.1 decision: Act, Attend, Track*, Track
-	SSVCTrace       string  `json:"ssvc_trace"` // which tree branches fired
+	Action          string  `json:"action"`
+	SSVCTrace       string  `json:"ssvc_trace"`
 	Explanation     string  `json:"explanation"`
 }
 
-// Engine computes risk scores for threat events.
-type Engine struct{}
-
-// NewEngine creates a risk scoring engine.
+// NewEngine creates a risk scoring engine with defaults.
 func NewEngine() *Engine {
-	return &Engine{}
+	return &Engine{cfg: defaultWeights()}
+}
+
+// NewEngineWithConfig creates a risk scoring engine from a RiskConfig.
+func NewEngineWithConfig(riskCfg config.RiskConfig) *Engine {
+	w := defaultWeights()
+	if riskCfg.Dimensions.Likelihood.Max > 0 {
+		w.MaxLikelihood = riskCfg.Dimensions.Likelihood.Max
+	}
+	if riskCfg.Dimensions.Impact.Max > 0 {
+		w.MaxImpact = riskCfg.Dimensions.Impact.Max
+	}
+	if riskCfg.Dimensions.Exposure.Max > 0 {
+		w.MaxExposure = riskCfg.Dimensions.Exposure.Max
+	}
+	if riskCfg.Dimensions.Confidence.Max > 0 {
+		w.MaxConfidence = riskCfg.Dimensions.Confidence.Max
+	}
+	if riskCfg.Severity.Thresholds != nil {
+		w.SeverityThresholds = riskCfg.Severity.Thresholds
+	}
+	return &Engine{cfg: w}
+}
+
+func defaultWeights() RiskWeights {
+	return RiskWeights{
+		MaxLikelihood: 5,
+		MaxImpact:     5,
+		MaxExposure:   3,
+		MaxConfidence: 4,
+		SeverityThresholds: map[string]float64{
+			"critical": 0.50,
+			"high":     0.25,
+			"medium":   0.10,
+		},
+	}
 }
 
 // Score evaluates a threat event against the organisation context using match results.
 func (e *Engine) Score(event model.ThreatEvent, org model.OrgContext, matches []model.Match) ScoreResult {
 	var result ScoreResult
 
-	// Compute each dimension
 	result.Likelihood = e.computeLikelihood(event, matches)
 	result.Impact = e.computeImpact(event, org, matches)
 	result.Exposure = e.computeExposure(event, org, matches)
 	result.Confidence = e.computeConfidence(event, matches)
 
-	// Compute risk score: (L × I × E) / (maxL × maxI × maxE)
 	riskScore := float64(result.Likelihood*result.Impact*result.Exposure) /
-		float64(maxLikelihood*maxImpact*maxExposure)
+		float64(e.cfg.MaxLikelihood*e.cfg.MaxImpact*e.cfg.MaxExposure)
 	result.RiskScore = riskScore
 
-	// Map to severity label
-	result.Severity = severityLabel(riskScore)
+	result.Severity = e.severityLabel(riskScore)
+	result.ConfidenceLabel = e.confidenceLabel(result.Confidence)
 
-	// Map to confidence label
-	result.ConfidenceLabel = confidenceLabel(result.Confidence)
-
-	// Run SSVC v2.1 decision tree for primary action output
 	ssvc := SSVCTree(event, org, matches)
 	result.Action = ssvc.Action
 	result.SSVCTrace = ssvc.Trace
 
-	// Generate explanation
 	result.Explanation = e.Explain(result, event, matches, org)
 
 	return result
 }
 
-// computeLikelihood computes the likelihood dimension (max: 5).
 func (e *Engine) computeLikelihood(event model.ThreatEvent, matches []model.Match) int {
 	score := 0
 
-	// Active exploitation (+3)
 	for _, m := range matches {
 		if m.KEVMatch {
 			score += 3
@@ -89,14 +119,13 @@ func (e *Engine) computeLikelihood(event model.ThreatEvent, matches []model.Matc
 	}
 	for _, tag := range event.Tags {
 		if tag == "exploit:in-the-wild" {
-			if score < 3 { // don't double-count if already from KEV
+			if score < 3 {
 				score += 3
 			}
 			break
 		}
 	}
 
-	// Weaponization (+2)
 	for _, tag := range event.Tags {
 		if tag == "exploit:weaponized" {
 			score += 2
@@ -104,19 +133,16 @@ func (e *Engine) computeLikelihood(event model.ThreatEvent, matches []model.Matc
 		}
 	}
 
-	// Known threat actor activity (+1)
 	if len(event.ThreatActors) > 0 {
 		score += 1
 	}
 
-	// Freshness — published within 7 days (+1)
 	if time.Since(event.Timestamp) < 7*24*time.Hour {
 		score += 1
 	}
 
-	// Clamp to max
-	if score > maxLikelihood {
-		score = maxLikelihood
+	if score > e.cfg.MaxLikelihood {
+		score = e.cfg.MaxLikelihood
 	}
 	if score < 0 {
 		score = 0
@@ -124,11 +150,9 @@ func (e *Engine) computeLikelihood(event model.ThreatEvent, matches []model.Matc
 	return score
 }
 
-// computeImpact computes the impact dimension (max: 5).
 func (e *Engine) computeImpact(event model.ThreatEvent, org model.OrgContext, matches []model.Match) int {
 	score := 0
 
-	// CVSS score
 	if event.CVSS >= 9.0 {
 		score += 3
 	} else if event.CVSS >= 7.0 {
@@ -137,7 +161,6 @@ func (e *Engine) computeImpact(event model.ThreatEvent, org model.OrgContext, ma
 		score += 1
 	}
 
-	// App criticality — find matched apps and check their criticality
 	hasCritical := false
 	hasHigh := false
 	for _, m := range matches {
@@ -161,12 +184,10 @@ func (e *Engine) computeImpact(event model.ThreatEvent, org model.OrgContext, ma
 		score += 1
 	}
 
-	// Baseline: if any match exists (including sector/KEV matches), minimum impact is 1
 	if score == 0 && len(matches) > 0 {
 		score = 1
 	}
 
-	// Data sensitivity — check if any matched app handles sensitive data
 	hasSensitive := false
 	for _, m := range matches {
 		if m.AppName == "" {
@@ -182,17 +203,15 @@ func (e *Engine) computeImpact(event model.ThreatEvent, org model.OrgContext, ma
 		score += 1
 	}
 
-	if score > maxImpact {
-		score = maxImpact
+	if score > e.cfg.MaxImpact {
+		score = e.cfg.MaxImpact
 	}
 	return score
 }
 
-// computeExposure computes the exposure dimension (max: 3).
 func (e *Engine) computeExposure(event model.ThreatEvent, org model.OrgContext, matches []model.Match) int {
 	score := 0
 
-	// Check if any matched app is internet-facing
 	hasAnyMatch := false
 	for _, m := range matches {
 		if m.AppName == "" {
@@ -210,13 +229,10 @@ func (e *Engine) computeExposure(event model.ThreatEvent, org model.OrgContext, 
 	}
 checkCred:
 
-	// Baseline: if any app matched, there's minimum exposure (you run the software)
 	if score == 0 && (hasAnyMatch || len(matches) > 0) {
 		score = 1
 	}
 
-	// Credential/identity exposure — check for phishing/credential tags
-	// (simplified v1: always 0 unless specific tags present)
 	for _, tag := range event.Tags {
 		if strings.Contains(tag, "phishing") || strings.Contains(tag, "credential") {
 			score += 1
@@ -224,17 +240,15 @@ checkCred:
 		}
 	}
 
-	if score > maxExposure {
-		score = maxExposure
+	if score > e.cfg.MaxExposure {
+		score = e.cfg.MaxExposure
 	}
 	return score
 }
 
-// computeConfidence computes the confidence dimension (max: 4).
 func (e *Engine) computeConfidence(event model.ThreatEvent, matches []model.Match) int {
 	score := 0
 
-	// Source confidence
 	switch event.SourceConfidence {
 	case "high":
 		score += 3
@@ -246,26 +260,28 @@ func (e *Engine) computeConfidence(event model.ThreatEvent, matches []model.Matc
 		score += 1
 	}
 
-	// Multiple independent sightings (from match data)
-	// v1 simplified: if event has sighting-related data, assume some
-	if score < maxConfidence {
-		score += 1 // default moderate confidence
+	if score < e.cfg.MaxConfidence {
+		score += 1
 	}
 
-	if score > maxConfidence {
-		score = maxConfidence
+	if score > e.cfg.MaxConfidence {
+		score = e.cfg.MaxConfidence
 	}
 	return score
 }
 
-// severityLabel maps a risk score to a severity label.
-func severityLabel(score float64) string {
+// severityLabel maps a risk score to a severity label using configured thresholds.
+func (e *Engine) severityLabel(score float64) string {
+	critical := e.cfg.SeverityThresholds["critical"]
+	high := e.cfg.SeverityThresholds["high"]
+	medium := e.cfg.SeverityThresholds["medium"]
+
 	switch {
-	case score >= 0.50:
+	case score >= critical:
 		return "critical"
-	case score >= 0.25:
+	case score >= high:
 		return "high"
-	case score >= 0.10:
+	case score >= medium:
 		return "medium"
 	default:
 		return "low"
@@ -273,7 +289,7 @@ func severityLabel(score float64) string {
 }
 
 // confidenceLabel maps a confidence score to a label.
-func confidenceLabel(score int) string {
+func (e *Engine) confidenceLabel(score int) string {
 	switch {
 	case score >= 3:
 		return "HIGH"
@@ -291,8 +307,7 @@ func (e *Engine) Explain(result ScoreResult, event model.ThreatEvent, matches []
 	b.WriteString(fmt.Sprintf("%s (confidence: %s)\n\n", strings.ToUpper(result.Severity), result.ConfidenceLabel))
 	b.WriteString(fmt.Sprintf("%s\n\n", event.Title))
 
-	// Likelihood
-	b.WriteString(fmt.Sprintf("Likelihood: %d/%d\n", result.Likelihood, maxLikelihood))
+	b.WriteString(fmt.Sprintf("Likelihood: %d/%d\n", result.Likelihood, e.cfg.MaxLikelihood))
 	for _, m := range matches {
 		if m.KEVMatch {
 			b.WriteString("  • Active exploitation confirmed by CISA KEV (+3)\n")
@@ -311,8 +326,7 @@ func (e *Engine) Explain(result ScoreResult, event model.ThreatEvent, matches []
 	}
 	b.WriteString("  • Recent publication (+1)\n")
 
-	// Impact
-	b.WriteString(fmt.Sprintf("\nImpact: %d/%d\n", result.Impact, maxImpact))
+	b.WriteString(fmt.Sprintf("\nImpact: %d/%d\n", result.Impact, e.cfg.MaxImpact))
 	if event.CVSS >= 9.0 {
 		b.WriteString(fmt.Sprintf("  • CVSS %.1f (+3)\n", event.CVSS))
 	} else if event.CVSS >= 7.0 {
@@ -328,8 +342,7 @@ func (e *Engine) Explain(result ScoreResult, event model.ThreatEvent, matches []
 		}
 	}
 
-	// Exposure
-	b.WriteString(fmt.Sprintf("\nExposure: %d/%d\n", result.Exposure, maxExposure))
+	b.WriteString(fmt.Sprintf("\nExposure: %d/%d\n", result.Exposure, e.cfg.MaxExposure))
 	for _, m := range matches {
 		if m.AppName != "" {
 			for _, app := range org.TechStack {
@@ -340,10 +353,8 @@ func (e *Engine) Explain(result ScoreResult, event model.ThreatEvent, matches []
 		}
 	}
 
-	// Confidence
-	b.WriteString(fmt.Sprintf("\nConfidence: %d/%d (%s)\n", result.Confidence, maxConfidence, result.ConfidenceLabel))
+	b.WriteString(fmt.Sprintf("\nConfidence: %d/%d (%s)\n", result.Confidence, e.cfg.MaxConfidence, result.ConfidenceLabel))
 	b.WriteString(fmt.Sprintf("  • Source: %s (%s confidence)\n", event.Source, event.SourceConfidence))
-	// Per-source attribution
 	for _, m := range matches {
 		if m.KEVMatch {
 			b.WriteString("  • CISA KEV confirmed (+3)\n")
@@ -354,14 +365,12 @@ func (e *Engine) Explain(result ScoreResult, event model.ThreatEvent, matches []
 	}
 	b.WriteString("  • Default baseline (+1)\n")
 
-	// SSVC Action — show the decision tree trace
 	b.WriteString(fmt.Sprintf("\nAction: %s\n", result.Action))
 	b.WriteString(fmt.Sprintf("  • SSVC path: %s\n", result.SSVCTrace))
 
-	// Score
 	b.WriteString(fmt.Sprintf("\nScore: (%d × %d × %d) / (%d × %d × %d) = %.2f → %s",
 		result.Likelihood, result.Impact, result.Exposure,
-		maxLikelihood, maxImpact, maxExposure,
+		e.cfg.MaxLikelihood, e.cfg.MaxImpact, e.cfg.MaxExposure,
 		result.RiskScore, strings.ToUpper(result.Severity)))
 
 	return b.String()

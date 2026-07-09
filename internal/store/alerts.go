@@ -60,3 +60,9 @@ func (db *DB) CleanDedup(ttl time.Duration) error {
 	_, err := db.conn.Exec("DELETE FROM dedup_hashes WHERE created_at < ?", cutoff)
 	return err
 }
+
+// SuppressAlertsForEvent marks all alerts for a given event as suppressed
+// (retracted intel — the source event was deleted or withdrawn).
+func (db *DB) SuppressAlertsForEvent(eventID string) {
+	db.conn.Exec("UPDATE alerts SET status = 'suppressed' WHERE event_id = ?", eventID)
+}

@@ -44,18 +44,9 @@ func (db *DB) Close() error {
 // migrate runs schema migrations.
 func (db *DB) migrate() error {
 	migrations := []string{
-		`CREATE TABLE IF NOT EXISTS sources (
-			id TEXT PRIMARY KEY,
-			type TEXT NOT NULL,
-			name TEXT NOT NULL,
-			confidence TEXT NOT NULL DEFAULT 'medium',
-			config_json TEXT NOT NULL DEFAULT '{}',
-			enabled INTEGER NOT NULL DEFAULT 1
-		)`,
-
 		`CREATE TABLE IF NOT EXISTS events (
 			id TEXT PRIMARY KEY,
-			source_id TEXT NOT NULL REFERENCES sources(id),
+			source_id TEXT NOT NULL,
 			source_event_id TEXT NOT NULL,
 			normalized_json TEXT NOT NULL,
 			timestamp TEXT NOT NULL,
@@ -91,48 +82,9 @@ func (db *DB) migrate() error {
 			org_id TEXT NOT NULL DEFAULT 'default'
 		)`,
 
-		`CREATE TABLE IF NOT EXISTS routing_rules (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			priority INTEGER NOT NULL DEFAULT 0,
-			severity TEXT NOT NULL,
-			confidence_levels TEXT NOT NULL,
-			channels TEXT NOT NULL,
-			slack_channel TEXT NOT NULL DEFAULT '',
-			email_to TEXT NOT NULL DEFAULT '',
-			format TEXT NOT NULL DEFAULT 'realtime',
-			org_id TEXT NOT NULL DEFAULT 'default'
-		)`,
-
-		`CREATE TABLE IF NOT EXISTS risk_config (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			config_json TEXT NOT NULL,
-			org_id TEXT NOT NULL DEFAULT 'default'
-		)`,
-
-		`CREATE TABLE IF NOT EXISTS matchers_config (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			config_json TEXT NOT NULL,
-			org_id TEXT NOT NULL DEFAULT 'default'
-		)`,
-
 		`CREATE TABLE IF NOT EXISTS dedup_hashes (
 			hash TEXT PRIMARY KEY,
 			created_at TEXT NOT NULL
-		)`,
-
-		`CREATE TABLE IF NOT EXISTS sighting_cache (
-			cve TEXT PRIMARY KEY,
-			count INTEGER NOT NULL DEFAULT 0,
-			updated_at TEXT NOT NULL
-		)`,
-
-		`CREATE TABLE IF NOT EXISTS notification_targets (
-			id TEXT PRIMARY KEY,
-			type TEXT NOT NULL,
-			name TEXT NOT NULL,
-			config_json TEXT NOT NULL DEFAULT '{}',
-			enabled INTEGER NOT NULL DEFAULT 1,
-			org_id TEXT NOT NULL DEFAULT 'default'
 		)`,
 
 		`CREATE TABLE IF NOT EXISTS state (

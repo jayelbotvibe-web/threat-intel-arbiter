@@ -176,7 +176,9 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
-		log.Printf("auth: updated user %s (%s)", body.Username, body.Role)
+		// Invalidate all sessions for updated user (role/password change)
+		s.DB.DeleteSessionsForUser(body.Username)
+		log.Printf("auth: updated user %s (%s, sessions invalidated)", body.Username, body.Role)
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 
 	case http.MethodDelete:
@@ -191,7 +193,9 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
-		log.Printf("auth: deleted user %s", body.Username)
+		// Invalidate all sessions for deleted user
+		s.DB.DeleteSessionsForUser(body.Username)
+		log.Printf("auth: deleted user %s (sessions invalidated)", body.Username)
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
 }
@@ -199,12 +203,25 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 // ─── Middleware ───
 
 // sessionFromCookie extracts and validates the session token from request cookies.
+// After getting the session, it re-checks the user record to ensure the user
+// still exists and reads the current role (not the stale session role).
 func (s *Server) sessionFromCookie(r *http.Request) (username, role string, ok bool) {
 	cookie, err := r.Cookie("arbiter_session")
 	if err != nil {
 		return "", "", false
 	}
-	return s.DB.GetSession(cookie.Value)
+	username, _, ok = s.DB.GetSession(cookie.Value)
+	if !ok {
+		return "", "", false
+	}
+	// Re-check user exists and read current role from user record
+	user, err := s.DB.GetUser(username)
+	if err != nil || user == nil {
+		// User was deleted — invalidate the session
+		s.DB.DeleteSession(cookie.Value)
+		return "", "", false
+	}
+	return user.Username, user.Role, true
 }
 
 // requireAuth is middleware that requires a valid session or admin API key.

@@ -85,7 +85,7 @@ func main() {
 			log.Printf("source %s: env %s not set, skipping", src.ID, src.AuthKeyEnv)
 			continue
 		}
-		client := source.NewMISPClient(src.URL, mispKey)
+		client := source.NewMISPClient(src.URL, mispKey, src.TLSSkipVerify, src.CACertPath)
 		poller := &source.MISPPoller{
 			Client:    client,
 			DB:        db,
@@ -141,7 +141,7 @@ func main() {
 	matchEngine := match.NewEngine(matchers...)
 	log.Printf("match engine ready: %d matchers (%v)", len(matchers), matchEngine.MatcherNames())
 
-	riskEngine := risk.NewEngine()
+	riskEngine := risk.NewEngineWithConfig(cfg.Risk)
 
 	// Build router from routing.yaml
 	var rules []notify.Rule

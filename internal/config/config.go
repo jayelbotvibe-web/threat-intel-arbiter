@@ -59,14 +59,16 @@ func (o OrgConfig) ToOrgContext(apps []model.App) model.OrgContext {
 // ─────────────────────────────────────────────────────────────
 
 type SourceEntry struct {
-	ID           string `json:"id"`
-	Type         string `json:"type"`
-	Name         string `json:"name"`
-	URL          string `json:"url"`
-	AuthKeyEnv   string `json:"auth_key_env"`
-	Confidence   string `json:"confidence"`
-	Enabled      bool   `json:"enabled"`
-	PullInterval string `json:"pull_interval"`
+	ID            string `json:"id"`
+	Type          string `json:"type"`
+	Name          string `json:"name"`
+	URL           string `json:"url"`
+	AuthKeyEnv    string `json:"auth_key_env"`
+	Confidence    string `json:"confidence"`
+	Enabled       bool   `json:"enabled"`
+	PullInterval  string `json:"pull_interval"`
+	TLSSkipVerify bool   `json:"tls_skip_verify"` // lab only — defaults to false
+	CACertPath    string `json:"ca_cert_path"`    // optional custom CA for self-signed MISP
 }
 
 type SourcesConfig struct {

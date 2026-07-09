@@ -59,7 +59,7 @@
             "event_id": "1001",
             "category": "External analysis",
             "type": "vulnerability",
-            "value1": "CVE-2024-38472",
+            "value": "CVE-2024-38472",
             "value2": "",
             "to_ids": false,
             "uuid": "attr-uuid-10001",
