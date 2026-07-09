@@ -148,3 +148,78 @@ func minimizeJSON(s string) string {
 	b, _ := json.Marshal(v)
 	return string(b)
 }
+
+// TestReaderSettingsMasksWebhooks verifies that webhook URLs and other
+// bearer credentials are masked in /api/settings responses.
+func TestReaderSettingsMasksWebhooks(t *testing.T) {
+	srv, cleanup := newTestServer(t)
+	defer cleanup()
+
+	// Seed settings with secrets
+	srv.DB.SetSetting(store.SettingSlackWebhook, "https://hooks.slack.com/services/TEST/B123/abc123xyz")
+	srv.DB.SetSetting(store.SettingTeamsWebhook, "https://example.webhook.office.com/webhookb2/test")
+	srv.DB.SetSetting(store.SettingCSSecret, "super-secret-api-key-12345")
+	srv.DB.SetSetting(store.SettingCSClientID, "client-id-abcdef")
+	srv.DB.SetSetting(store.SettingEmailTarget, "soc@example.com") // not a secret
+
+	// Create reader user and login
+	password := "readerpass"
+	srv.DB.CreateUser("reader-user", password, "reader")
+	cookie := loginHelper(t, srv, "reader-user", password)
+
+	// GET /api/settings as reader
+	req := httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	req.AddCookie(&http.Cookie{Name: "arbiter_session", Value: cookie})
+	w := httptest.NewRecorder()
+	srv.Mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("settings GET returned %d", w.Code)
+	}
+
+	var resp struct {
+		Settings map[string]string `json:"settings"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	// Slack webhook URL should be masked (it's a webhook = bearer credential)
+	if slack, ok := resp.Settings[store.SettingSlackWebhook]; ok {
+		if strings.Contains(slack, "hooks.slack.com") {
+			t.Errorf("slack webhook URL leaked in reader response: %s", slack)
+		}
+		t.Logf("slack webhook: %s (expected masked)", slack)
+	}
+
+	// Teams webhook URL should be masked
+	if teams, ok := resp.Settings[store.SettingTeamsWebhook]; ok {
+		if strings.Contains(teams, "webhook.office.com") {
+			t.Errorf("teams webhook URL leaked in reader response: %s", teams)
+		}
+		t.Logf("teams webhook: %s (expected masked)", teams)
+	}
+
+	// CS secret should be masked
+	if csSecret, ok := resp.Settings[store.SettingCSSecret]; ok {
+		if strings.Contains(csSecret, "super-secret") {
+			t.Errorf("CS secret leaked in reader response: %s", csSecret)
+		}
+		t.Logf("cs_secret: %s (expected masked)", csSecret)
+	}
+
+	// CS client ID should be masked (matches 'key' or 'id' pattern? — actually 'client_id' contains no secret keyword)
+	// per the regex (?i)(webhook|token|key|secret|password|api_key), 'client_id' does NOT match
+	// but 'cs_client_id' DOES contain 'id'... wait, the regex is for the setting KEY name, not value
+	// 'cs_client_id' — does it match? Let's check: 'client_id' — contains... no it doesn't contain
+	// webhook, token, key, secret, password, or api_key. So it should NOT be masked.
+	// Actually 'cs_client_id' does NOT match the pattern. That's fine per spec.
+
+	// Email target should NOT be masked (it's not a secret key)
+	if email, ok := resp.Settings[store.SettingEmailTarget]; ok {
+		if email != "soc@example.com" {
+			t.Errorf("email target incorrectly masked: %s", email)
+		}
+		t.Logf("email_target: %s (expected unmasked)", email)
+	}
+}
