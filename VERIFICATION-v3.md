@@ -628,3 +628,22 @@ Note: No new commits in Round 3.2 — all tasks were diagnostic (BLOCKED on MISP
 | TASK-C | RESOLVED — second SKIP was stale test cache artifact; only live-capture test SKIP remains |
 | TASK-D | COMPLETE — evidence from reflog confirms work existed; push verification gap identified and closed |
 | TASK-E | DONE — VM stopped, original config restored |
+
+---
+
+## Round 3.2 status revised — 2026-07-09 16:33 UTC
+
+After user fixed guest networking (ens33→enp0s17), all remaining tasks completed:
+
+| Task | Revised Status | Details |
+|------|---------------|---------|
+| TASK-A | **COMPLETE** | VM at 172.16.146.129, MISP 2.4.220, API key generated via `cake user change_authkey` |
+| TASK-B | **COMPLETE** | Fixture captured (335KB, sha256 d799b7cb...), test PASSES, 2 CVEs extracted, SKIP→Fatalf |
+| TASK-C | RESOLVED | SKIP count = 0 across entire suite |
+| TASK-D | COMPLETE | (unchanged) |
+| TASK-E | DONE | VM shut down via `sudo shutdown -h now`, confirmed stopped |
+
+**Final branch head:** `906dd9f9e07d62af5e2e6691b74363b4d7f460ab`
+**Fixture sha256:** `d799b7cb4fc60618b11553c4ab80cc1f9b8e07e84dbf43e4d573fcaa3c535ad8`
+**SKIP count:** `0`
+**`git ls-remote`:** confirms `906dd9f9e07d62af5e2e6691b74363b4d7f460ab` on GitHub
