@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"testing"
 	"time"
@@ -459,4 +460,92 @@ func TestMISPClient_AuthFailure(t *testing.T) {
 		t.Error("expected auth error, got nil")
 	}
 	t.Logf("auth error (expected): %v", err)
+}
+
+// TestParse_Value1KeyIsIgnored verifies that the old `value1` key no longer works.
+// This pins the correct binding: if someone reverts to `json:"value1"`, the
+// existing tests above (which use `value` in fixtures) will fail.
+func TestParse_Value1KeyIsIgnored(t *testing.T) {
+	// JSON using the OLD wrong key shape
+	oldShape := []byte(`{
+		"response": [{
+			"Event": {
+				"id": "1",
+				"uuid": "test-1",
+				"info": "Test event with value1 key",
+				"Attribute": [{
+					"id": "1",
+					"type": "vulnerability",
+					"category": "External analysis",
+					"value1": "CVE-2024-99999",
+					"comment": "test"
+				}]
+			}
+		}]
+	}`)
+
+	var resp MISPResponse
+	if err := json.Unmarshal(oldShape, &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Response) == 0 {
+		t.Fatal("no events parsed")
+	}
+
+	event := NormalizeMISPEvent(resp.Response[0].Event)
+
+	// The CVE in value1 should NOT be extracted because we bind to "value" now
+	for _, cve := range event.CVEs {
+		if cve == "CVE-2024-99999" {
+			t.Error("CVE from value1 key was incorrectly extracted — value1 binding still active")
+		}
+	}
+
+	// Verify the attribute value is indeed empty
+	if len(resp.Response[0].Event.Attributes) > 0 {
+		if resp.Response[0].Event.Attributes[0].Value != "" {
+			t.Errorf("expected empty Value from value1 key, got %q", resp.Response[0].Event.Attributes[0].Value)
+		}
+	}
+	t.Log("value1 key correctly ignored")
+}
+
+// TestParseLiveCapture_ExtractsAtLeastOneCVE verifies that a real MISP
+// restSearch response (live capture) parses and extracts CVEs.
+// Status: SKIPPED — no live MISP instance available in this session.
+// A live capture fixture must be placed at testdata/misp_restsearch_live_capture.json
+// before this test can pass.
+func TestParseLiveCapture_ExtractsAtLeastOneCVE(t *testing.T) {
+	// Try to load the live capture fixture
+	fixtures := loadFixtures(t, "")
+	data, ok := fixtures["misp_restsearch_live_capture.json"]
+	if !ok {
+		t.Skip("SKIPPED: no live capture fixture at testdata/misp_restsearch_live_capture.json — capture one with curl against a live MISP instance")
+	}
+
+	var wrapper struct {
+		Response []struct {
+			Event MISPEvent `json:"Event"`
+		} `json:"response"`
+	}
+	if err := json.Unmarshal(data, &wrapper); err != nil {
+		t.Fatalf("unmarshal live capture: %v", err)
+	}
+	if len(wrapper.Response) == 0 {
+		t.Fatal("live capture has no events")
+	}
+
+	cveCount := 0
+	for _, item := range wrapper.Response {
+		event := NormalizeMISPEvent(item.Event)
+		for _, cve := range event.CVEs {
+			if matched, _ := regexp.MatchString(`^CVE-\d{4}-\d+$`, cve); matched {
+				cveCount++
+			}
+		}
+	}
+	if cveCount == 0 {
+		t.Error("live capture contains zero extractable CVEs — check fixture or value binding")
+	}
+	t.Logf("extracted %d CVEs from live capture", cveCount)
 }

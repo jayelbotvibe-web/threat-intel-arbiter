@@ -79,7 +79,7 @@ type MISPAttribute struct {
 	ID       string         `json:"id"`
 	Category string         `json:"category"`
 	Type     string         `json:"type"`
-	Value    string         `json:"value1"`
+	Value    string         `json:"value"`
 	Comment  string         `json:"comment"`
 	Tags     []MISPEventTag `json:"Tag"`
 }
