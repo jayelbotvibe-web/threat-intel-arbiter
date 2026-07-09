@@ -64,10 +64,12 @@ type Match struct {
 	AppName         string `json:"app_name,omitempty"`
 	AppVersion      string `json:"app_version,omitempty"`
 	VersionAffected bool   `json:"version_affected"`
-	MatchConfidence string `json:"match_confidence"` // "exact_version_match", "product_only_match", "unparseable_version"
+	MatchConfidence string `json:"match_confidence"` // "exact_version_match", "product_only_match", "weak_title_match", "unparseable_version"
 	SectorMatch     bool   `json:"sector_match"`
 	KEVMatch        bool   `json:"kev_match"`
 	Details         string `json:"details"`
+	Suppressed      bool   `json:"suppressed,omitempty"`
+	SuppressReason  string `json:"suppress_reason,omitempty"`
 }
 
 // Matcher is the interface implemented by all threat matchers.
