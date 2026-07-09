@@ -85,7 +85,7 @@ func main() {
 			log.Printf("source %s: env %s not set, skipping", src.ID, src.AuthKeyEnv)
 			continue
 		}
-		client := source.NewMISPClient(src.URL, mispKey)
+		client := source.NewMISPClient(src.URL, mispKey, src.TLSSkipVerify, src.CACertPath)
 		poller := &source.MISPPoller{
 			Client:    client,
 			DB:        db,

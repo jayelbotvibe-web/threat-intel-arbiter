@@ -134,7 +134,7 @@ func TestMISPClientFetchEvents(t *testing.T) {
 	srv := fixtureServer(t)
 	defer srv.Close()
 
-	client := NewMISPClient(srv.URL, "test-api-key")
+	client := NewMISPClient(srv.URL, "test-api-key", false, "")
 	events, err := client.FetchEvents("", 100, 0)
 	if err != nil {
 		t.Fatalf("FetchEvents: %v", err)
@@ -283,7 +283,7 @@ func TestMISPPoller_FirstRun(t *testing.T) {
 
 	events := make(chan model.ThreatEvent, 100)
 	poller := &MISPPoller{
-		Client:    NewMISPClient(srv.URL, "test-api-key"),
+		Client:    NewMISPClient(srv.URL, "test-api-key", false, ""),
 		DB:        db,
 		Events:    events,
 		Interval:  15 * time.Minute,
@@ -343,7 +343,7 @@ func TestMISPPoller_SecondRun_NoColdStart(t *testing.T) {
 
 	events := make(chan model.ThreatEvent, 100)
 	poller := &MISPPoller{
-		Client:    NewMISPClient(srv.URL, "test-api-key"),
+		Client:    NewMISPClient(srv.URL, "test-api-key", false, ""),
 		DB:        db,
 		Events:    events,
 		Interval:  15 * time.Minute,
@@ -396,7 +396,7 @@ func TestMISPPoller_CursorPersistsAcrossRestart(t *testing.T) {
 
 	events := make(chan model.ThreatEvent, 100)
 	poller := &MISPPoller{
-		Client:    NewMISPClient(srv.URL, "test-api-key"),
+		Client:    NewMISPClient(srv.URL, "test-api-key", false, ""),
 		DB:        db,
 		Events:    events,
 		Interval:  15 * time.Minute,
@@ -423,7 +423,7 @@ func TestMISPPoller_CursorPersistsAcrossRestart(t *testing.T) {
 
 	events2 := make(chan model.ThreatEvent, 100)
 	poller2 := &MISPPoller{
-		Client:    NewMISPClient(srv.URL, "test-api-key"),
+		Client:    NewMISPClient(srv.URL, "test-api-key", false, ""),
 		DB:        db2,
 		Events:    events2,
 		Interval:  15 * time.Minute,
@@ -454,12 +454,38 @@ func TestMISPClient_AuthFailure(t *testing.T) {
 	defer srv.Close()
 
 	// Client with no API key
-	client := NewMISPClient(srv.URL, "")
+	client := NewMISPClient(srv.URL, "", false, "")
 	_, err := client.FetchEvents("", 10, 0)
 	if err == nil {
 		t.Error("expected auth error, got nil")
 	}
 	t.Logf("auth error (expected): %v", err)
+}
+
+// TestTLSVerifyDefaultOn verifies that TLS verification is enabled by default
+// (no InsecureSkipVerify when tlsSkipVerify is false).
+func TestTLSVerifyDefaultOn(t *testing.T) {
+	// Create client with default (secure) settings
+	client := NewMISPClient("https://example.com", "key", false, "")
+
+	transport, ok := client.HTTP.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	if transport.TLSClientConfig == nil {
+		t.Error("TLSClientConfig is nil — expected a config with verification enabled")
+	} else if transport.TLSClientConfig.InsecureSkipVerify {
+		t.Error("InsecureSkipVerify is true by default — should be false")
+	}
+	t.Log("TLS verification enabled by default (InsecureSkipVerify=false)")
+
+	// Verify that tlsSkipVerify=true does set InsecureSkipVerify
+	clientInsecure := NewMISPClient("https://example.com", "key", true, "")
+	transport2 := clientInsecure.HTTP.Transport.(*http.Transport)
+	if transport2.TLSClientConfig == nil || !transport2.TLSClientConfig.InsecureSkipVerify {
+		t.Error("InsecureSkipVerify should be true when tlsSkipVerify=true")
+	}
+	t.Log("TLS verification correctly disabled when tlsSkipVerify=true")
 }
 
 // TestParse_Value1KeyIsIgnored verifies that the old `value1` key no longer works.

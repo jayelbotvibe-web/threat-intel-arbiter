@@ -3,11 +3,14 @@ package source
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -23,14 +26,36 @@ type MISPClient struct {
 }
 
 // NewMISPClient creates a new MISP API client.
-func NewMISPClient(baseURL, apiKey string) *MISPClient {
+// tlsSkipVerify disables TLS certificate verification (lab use only — a WARN is logged).
+// caCertPath loads a custom CA certificate for self-signed lab MISPs.
+func NewMISPClient(baseURL, apiKey string, tlsSkipVerify bool, caCertPath string) *MISPClient {
+	tlsConfig := &tls.Config{}
+
+	if caCertPath != "" {
+		caCert, err := os.ReadFile(caCertPath)
+		if err != nil {
+			log.Printf("misp: WARNING — failed to read CA cert from %s: %v (falling back to system pool)", caCertPath, err)
+		} else {
+			pool := x509.NewCertPool()
+			if !pool.AppendCertsFromPEM(caCert) {
+				log.Printf("misp: WARNING — no certificates found in %s", caCertPath)
+			}
+			tlsConfig.RootCAs = pool
+		}
+	}
+
+	if tlsSkipVerify {
+		tlsConfig.InsecureSkipVerify = true
+		log.Printf("misp: WARNING — TLS certificate verification DISABLED — lab use only")
+	}
+
 	return &MISPClient{
 		BaseURL: strings.TrimRight(baseURL, "/"),
 		APIKey:  apiKey,
 		HTTP: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				TLSClientConfig: tlsConfig,
 			},
 		},
 	}
