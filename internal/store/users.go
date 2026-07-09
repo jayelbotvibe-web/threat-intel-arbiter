@@ -139,6 +139,12 @@ func (db *DB) DeleteSession(token string) {
 	db.conn.Exec("DELETE FROM sessions WHERE token = ?", tokenHash)
 }
 
+// DeleteSessionsForUser removes all sessions for a given username.
+// Called when a user is deleted, demoted, or has their password changed.
+func (db *DB) DeleteSessionsForUser(username string) {
+	db.conn.Exec("DELETE FROM sessions WHERE username = ?", username)
+}
+
 // CleanExpiredSessions removes expired sessions.
 func (db *DB) CleanExpiredSessions() {
 	db.conn.Exec("DELETE FROM sessions WHERE expires_at < ?", time.Now().Format(time.RFC3339))
