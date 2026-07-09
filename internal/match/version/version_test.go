@@ -64,10 +64,10 @@ func TestParse(t *testing.T) {
 
 func TestInRange(t *testing.T) {
 	tests := []struct {
-		name    string
-		version string
-		start   string
-		end     string
+		name     string
+		version  string
+		start    string
+		end      string
 		affected bool
 		conf     string
 	}{

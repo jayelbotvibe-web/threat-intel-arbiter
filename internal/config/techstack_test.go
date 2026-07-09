@@ -72,7 +72,7 @@ func TestComputeDelta(t *testing.T) {
 
 	newApps := []model.App{
 		{Name: "Apache HTTP Server", Vendor: "Apache", Criticality: "critical", InternetFacing: true}, // modified
-		{Name: "PostgreSQL", Vendor: "PostgreSQL", Criticality: "high", InternetFacing: false},          // unchanged
+		{Name: "PostgreSQL", Vendor: "PostgreSQL", Criticality: "high", InternetFacing: false},        // unchanged
 		// nginx removed
 		{Name: "SAP NetWeaver", Vendor: "SAP", Criticality: "critical", InternetFacing: false}, // added
 	}

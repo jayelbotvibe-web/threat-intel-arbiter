@@ -43,7 +43,7 @@ type App struct {
 	InternetFacing  bool   `json:"internet_facing"`
 	Hosts           string `json:"hosts"`
 	DataSensitivity string `json:"data_sensitivity"` // "critical", "high", "medium", "low"
-	LastVerified    string `json:"last_verified"`     // ISO 8601 timestamp; empty if never verified
+	LastVerified    string `json:"last_verified"`    // ISO 8601 timestamp; empty if never verified
 }
 
 // OrgContext holds the organisation's profile for matching and scoring.
@@ -84,7 +84,7 @@ type Alert struct {
 	EventID     string   `json:"event_id"`
 	Severity    string   `json:"severity"`
 	Confidence  string   `json:"confidence"`
-	Action      string   `json:"action"`       // SSVC v2.1: Act, Attend, Track*, Track
+	Action      string   `json:"action"` // SSVC v2.1: Act, Attend, Track*, Track
 	Explanation string   `json:"explanation"`
 	Status      string   `json:"status"`
 	MatchedApps []string `json:"matched_apps"`
@@ -105,10 +105,10 @@ const (
 
 // IOC represents an indicator of compromise extracted from a threat event.
 type IOC struct {
-	Type        IOCType `json:"type"`
-	Value       string  `json:"value"`
-	Description string  `json:"description"`
-	Severity    string  `json:"severity"`
-	Source      string  `json:"source"`
+	Type        IOCType  `json:"type"`
+	Value       string   `json:"value"`
+	Description string   `json:"description"`
+	Severity    string   `json:"severity"`
+	Source      string   `json:"source"`
 	Tags        []string `json:"tags,omitempty"`
 }

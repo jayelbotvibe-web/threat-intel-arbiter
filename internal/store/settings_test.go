@@ -1,6 +1,7 @@
 package store
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -73,10 +74,19 @@ func TestSettings_Masking(t *testing.T) {
 		t.Errorf("short secret masking: got %q, want ****", masked)
 	}
 
-	// Non-secret keys pass through
-	clear := maskValue(SettingSlackWebhook, "https://hooks.slack.com/xyz")
-	if clear != "https://hooks.slack.com/xyz" {
+	// Non-secret keys pass through (email_target has no secret keyword)
+	clear := maskValue(SettingEmailTarget, "soc@example.com")
+	if clear != "soc@example.com" {
 		t.Errorf("non-secret masked incorrectly: got %q", clear)
+	}
+
+	// Webhook URLs are now masked (contain 'webhook' in key name)
+	webhook := maskValue(SettingSlackWebhook, "https://hooks.slack.com/TEST/abc/123456")
+	if webhook == "https://hooks.slack.com/TEST/abc/123456" {
+		t.Errorf("webhook URL should be masked, got unmasked: %q", webhook)
+	}
+	if !strings.HasPrefix(webhook, "****") {
+		t.Errorf("webhook masking should start with ****, got %q", webhook)
 	}
 
 	// Empty values stay empty
@@ -97,8 +107,8 @@ func TestSettings_GetAllMasked(t *testing.T) {
 		t.Fatalf("GetAllSettingsMasked: %v", err)
 	}
 
-	if all[SettingSlackWebhook] != "https://hooks.slack.com/TEST123" {
-		t.Errorf("webhook should not be masked: %q", all[SettingSlackWebhook])
+	if !strings.HasPrefix(all[SettingSlackWebhook], "****") {
+		t.Errorf("webhook should be masked: %q", all[SettingSlackWebhook])
 	}
 	if all[SettingCSSecret] != "****5678" {
 		t.Errorf("secret should be masked: %q", all[SettingCSSecret])

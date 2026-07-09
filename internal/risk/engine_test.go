@@ -169,18 +169,18 @@ func TestScoreEdges(t *testing.T) {
 	engine := NewEngine()
 
 	tests := []struct {
-		name     string
-		event    model.ThreatEvent
-		org      model.OrgContext
-		matches  []model.Match
-		wantSev  string
+		name    string
+		event   model.ThreatEvent
+		org     model.OrgContext
+		matches []model.Match
+		wantSev string
 	}{
 		{
 			name: "max everything",
 			event: model.ThreatEvent{
 				ID: "max-test", CVEs: []string{"CVE-2024-99999"}, CVSS: 9.8,
-				Tags: []string{"exploit:in-the-wild", "exploit:weaponized"},
-				ThreatActors: []string{"APT41"},
+				Tags:             []string{"exploit:in-the-wild", "exploit:weaponized"},
+				ThreatActors:     []string{"APT41"},
 				SourceConfidence: "high",
 			},
 			org: model.OrgContext{
@@ -240,10 +240,10 @@ func TestSSVC_KEV_Floored(t *testing.T) {
 	engine := NewEngine()
 
 	event := model.ThreatEvent{
-		ID:    "CVE-2024-99999",
-		CVEs:  []string{"CVE-2024-99999"},
-		CVSS:  5.0,
-		Title: "KEV-listed vuln in LowPriApp",
+		ID:               "CVE-2024-99999",
+		CVEs:             []string{"CVE-2024-99999"},
+		CVSS:             5.0,
+		Title:            "KEV-listed vuln in LowPriApp",
 		SourceConfidence: "medium",
 	}
 	org := model.OrgContext{
@@ -346,7 +346,7 @@ func TestSSVC_EmptyEvent(t *testing.T) {
 	event := model.ThreatEvent{
 		ID: "empty", SourceConfidence: "low",
 	}
-	org     := model.OrgContext{}
+	org := model.OrgContext{}
 	matches := []model.Match{}
 
 	result := engine.Score(event, org, matches)

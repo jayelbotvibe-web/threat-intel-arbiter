@@ -62,14 +62,14 @@ func (m *CVEMatcher) cveMatchesApp(cve string, app model.App, event model.Threat
 		if !inRange {
 			// Version is outside the affected range — suppress
 			return &model.Match{
-				Matcher:        "CVEMatcher",
-				CVE:            cve,
-				AppName:        app.Name,
-				AppVersion:     app.Version,
+				Matcher:         "CVEMatcher",
+				CVE:             cve,
+				AppName:         app.Name,
+				AppVersion:      app.Version,
 				MatchConfidence: "version_not_affected",
-				Suppressed:     true,
-				SuppressReason: "version_not_affected: " + app.Name + " " + app.Version + " outside affected range [" + cveRange.VersionStart + "," + cveRange.VersionEnd + "]",
-				Details:        "CVE " + cve + " does not affect " + app.Name + " " + app.Version,
+				Suppressed:      true,
+				SuppressReason:  "version_not_affected: " + app.Name + " " + app.Version + " outside affected range [" + cveRange.VersionStart + "," + cveRange.VersionEnd + "]",
+				Details:         "CVE " + cve + " does not affect " + app.Name + " " + app.Version,
 			}
 		}
 		confidence = label // "exact_version_match" or "product_only_match" from InRange
@@ -83,9 +83,9 @@ func (m *CVEMatcher) cveMatchesApp(cve string, app model.App, event model.Threat
 		CVE:             cve,
 		AppName:         app.Name,
 		AppVersion:      app.Version,
-		VersionAffected:  versionAffected,
-		MatchConfidence:  confidence,
-		Details:          "CVE " + cve + " matches " + app.Name + " (" + app.Vendor + ")",
+		VersionAffected: versionAffected,
+		MatchConfidence: confidence,
+		Details:         "CVE " + cve + " matches " + app.Name + " (" + app.Vendor + ")",
 	}
 }
 
@@ -154,21 +154,21 @@ func (m *CVEMatcher) normalizeProduct(name string) string {
 // defaultAliases returns the built-in vendor alias map.
 func defaultAliases() map[string]string {
 	return map[string]string{
-		"apache software foundation":  "apache",
+		"apache software foundation":     "apache",
 		"the apache software foundation": "apache",
-		"httpd":                         "apache http server",
-		"microsoft corporation":         "microsoft",
-		"microsoft corp":                "microsoft",
-		"ms":                            "microsoft",
-		"red hat":                       "red hat",
-		"redhat":                        "red hat",
-		"canonical":                     "canonical",
-		"atlassian":                     "atlassian",
-		"atlassian pty ltd":             "atlassian",
-		"sap ag":                        "sap",
-		"sap se":                        "sap",
-		"siemens ag":                    "siemens",
-		"siemens":                       "siemens",
+		"httpd":                          "apache http server",
+		"microsoft corporation":          "microsoft",
+		"microsoft corp":                 "microsoft",
+		"ms":                             "microsoft",
+		"red hat":                        "red hat",
+		"redhat":                         "red hat",
+		"canonical":                      "canonical",
+		"atlassian":                      "atlassian",
+		"atlassian pty ltd":              "atlassian",
+		"sap ag":                         "sap",
+		"sap se":                         "sap",
+		"siemens ag":                     "siemens",
+		"siemens":                        "siemens",
 	}
 }
 
@@ -176,14 +176,14 @@ func defaultAliases() map[string]string {
 // Maps common CVE/MISP product names to tech stack application names.
 func defaultProductAliases() map[string]string {
 	return map[string]string{
-		"httpd":               "apache http server",
-		"apache2":             "apache http server",
-		"apache httpd":        "apache http server",
-		"microsoft windows":   "windows server",
-		"windows":             "windows server",
-		"windows 10":          "windows server",
-		"windows 11":          "windows server",
-		"sap netweaver":       "sap s/4hana",
-		"netweaver":           "sap s/4hana",
+		"httpd":             "apache http server",
+		"apache2":           "apache http server",
+		"apache httpd":      "apache http server",
+		"microsoft windows": "windows server",
+		"windows":           "windows server",
+		"windows 10":        "windows server",
+		"windows 11":        "windows server",
+		"sap netweaver":     "sap s/4hana",
+		"netweaver":         "sap s/4hana",
 	}
 }

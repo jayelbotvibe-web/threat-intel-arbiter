@@ -8,8 +8,8 @@ package risk
 
 import (
 	"fmt"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/config"
 	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/model"

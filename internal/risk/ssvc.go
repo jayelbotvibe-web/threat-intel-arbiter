@@ -5,13 +5,13 @@
 // tree, not a score-to-label mapping.
 //
 // Decision points:
-//   1. Exploitation — KEV/exploit tags → active; else → none
-//      (EPSS → PoC pathway reserved for Workstream 3)
-//   2. Exposure — internet-facing → open; matched internal → controlled;
-//      no match → small
-//   3. Automatable — CVSS ≥ 7 → yes (conservative heuristic);
-//      // ponytail: upgrade path is parsing CVSS vector strings
-//   4. Mission & Well-being — from asset criticality + data sensitivity
+//  1. Exploitation — KEV/exploit tags → active; else → none
+//     (EPSS → PoC pathway reserved for Workstream 3)
+//  2. Exposure — internet-facing → open; matched internal → controlled;
+//     no match → small
+//  3. Automatable — CVSS ≥ 7 → yes (conservative heuristic);
+//     // ponytail: upgrade path is parsing CVSS vector strings
+//  4. Mission & Well-being — from asset criticality + data sensitivity
 //
 // Outputs: Act, Attend, Track*, Track (the canonical SSVC v2 labels).
 package risk
@@ -36,9 +36,9 @@ const (
 
 // SSVC action labels (canonical v2.1 Deployer outputs).
 const (
-	ActionAct     = "Act"
-	ActionAttend  = "Attend"
-	ActionTrack   = "Track"
+	ActionAct       = "Act"
+	ActionAttend    = "Attend"
+	ActionTrack     = "Track"
 	ActionTrackStar = "Track*"
 )
 

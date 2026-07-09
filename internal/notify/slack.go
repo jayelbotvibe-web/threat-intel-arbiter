@@ -56,8 +56,8 @@ func (n *SlackNotifier) Send(alert model.Alert) error {
 					{"title": "Severity", "value": strings.ToUpper(alert.Severity), "short": true},
 					{"title": "Confidence", "value": alert.Confidence, "short": true},
 				},
-				"footer":     fmt.Sprintf("Alert ID: %s · Event: %s", alert.ID, alert.EventID),
-				"ts":         time.Now().Unix(),
+				"footer": fmt.Sprintf("Alert ID: %s · Event: %s", alert.ID, alert.EventID),
+				"ts":     time.Now().Unix(),
 			},
 		},
 	}

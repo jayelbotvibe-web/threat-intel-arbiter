@@ -333,13 +333,13 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	s.DB.Conn().QueryRow("SELECT COUNT(*) FROM alerts WHERE event_id LIKE 'CVE-%'").Scan(&kevCount)
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"status":           "ok",
-		"alerts_total":     alertCount,
-		"alerts_new":       newAlerts,
-		"last_misp_pull":   lastPull,
-		"kev_entries":      kevCount,
-		"dedup_entries":    deadLetterCount,
-		"cs_mock":          os.Getenv("CROWDSTRIKE_CLIENT_ID") == "",
+		"status":         "ok",
+		"alerts_total":   alertCount,
+		"alerts_new":     newAlerts,
+		"last_misp_pull": lastPull,
+		"kev_entries":    kevCount,
+		"dedup_entries":  deadLetterCount,
+		"cs_mock":        os.Getenv("CROWDSTRIKE_CLIENT_ID") == "",
 	})
 }
 
@@ -379,15 +379,15 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type alertRow struct {
-		ID          string `json:"id"`
-		EventID     string `json:"event_id"`
-		Severity    string `json:"severity"`
-		Confidence  string `json:"confidence"`
-		Status      string `json:"status"`
-		MatchedApps string `json:"matched_apps"`
-		CreatedAt   string `json:"created_at"`
-		Explanation string `json:"explanation"`
-		Action      string `json:"action"`
+		ID          string  `json:"id"`
+		EventID     string  `json:"event_id"`
+		Severity    string  `json:"severity"`
+		Confidence  string  `json:"confidence"`
+		Status      string  `json:"status"`
+		MatchedApps string  `json:"matched_apps"`
+		CreatedAt   string  `json:"created_at"`
+		Explanation string  `json:"explanation"`
+		Action      string  `json:"action"`
 		RiskScore   float64 `json:"risk_score"`
 		SSVCAction  string  `json:"ssvc_action"`
 		CVE         string  `json:"cve"`
@@ -507,16 +507,16 @@ func (s *Server) handleTechStack(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type appSummary struct {
-		Name           string `json:"name"`
-		Version        string `json:"version"`
-		Vendor         string `json:"vendor"`
-		Category       string `json:"category"`
-		Criticality    string `json:"criticality"`
-		OwnerTeam      string `json:"owner_team"`
-		InternetFacing bool   `json:"internet_facing"`
-		Hosts          string `json:"hosts"`
+		Name            string `json:"name"`
+		Version         string `json:"version"`
+		Vendor          string `json:"vendor"`
+		Category        string `json:"category"`
+		Criticality     string `json:"criticality"`
+		OwnerTeam       string `json:"owner_team"`
+		InternetFacing  bool   `json:"internet_facing"`
+		Hosts           string `json:"hosts"`
 		DataSensitivity string `json:"data_sensitivity"`
-		LastVerified   string `json:"last_verified"`
+		LastVerified    string `json:"last_verified"`
 	}
 
 	var list []appSummary

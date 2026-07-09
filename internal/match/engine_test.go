@@ -72,21 +72,21 @@ func TestCVEMatcher(t *testing.T) {
 		wantApps []string
 	}{
 		{
-			name:    "Apache CVE matches Apache HTTP Server",
-			fixture: "misp_event_critical_apache.json",
-			wantMin: 1,
+			name:     "Apache CVE matches Apache HTTP Server",
+			fixture:  "misp_event_critical_apache.json",
+			wantMin:  1,
 			wantApps: []string{"Apache HTTP Server"},
 		},
 		{
-			name:    "Windows CVE matches Windows Server",
-			fixture: "misp_event_kev_windows.json",
-			wantMin: 1,
+			name:     "Windows CVE matches Windows Server",
+			fixture:  "misp_event_kev_windows.json",
+			wantMin:  1,
 			wantApps: []string{"Windows Server"},
 		},
 		{
-			name:    "SAP CVE matches SAP S/4HANA",
-			fixture: "misp_event_sap_critical.json",
-			wantMin: 1,
+			name:     "SAP CVE matches SAP S/4HANA",
+			fixture:  "misp_event_sap_critical.json",
+			wantMin:  1,
 			wantApps: []string{"SAP S/4HANA"},
 		},
 		{
@@ -138,9 +138,9 @@ func TestSectorMatcher(t *testing.T) {
 	m := &SectorMatcher{}
 
 	tests := []struct {
-		name        string
-		fixture     string
-		wantSector  bool
+		name       string
+		fixture    string
+		wantSector bool
 	}{
 		{
 			name:       "Apache event tagged manufacturing — sector match",
@@ -198,10 +198,10 @@ func TestKEVMatcher(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		fixture  string
-		wantKEV  bool
-		wantCVE  string
+		name    string
+		fixture string
+		wantKEV bool
+		wantCVE string
 	}{
 		{
 			name:    "Apache CVE is in KEV",

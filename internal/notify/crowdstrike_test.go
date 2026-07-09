@@ -16,10 +16,10 @@ import (
 
 func TestValidateIOC(t *testing.T) {
 	tests := []struct {
-		name   string
-		typ    string
-		value  string
-		want   string
+		name  string
+		typ   string
+		value string
+		want  string
 	}{
 		// Valid inputs
 		{"valid ipv4", "ipv4", "45.153.241.187", "45.153.241.187"},
@@ -70,17 +70,17 @@ func TestDenylist(t *testing.T) {
 	cs.Mock = true // avoid network calls
 
 	event := model.ThreatEvent{
-		ID:     "test-123",
-		Title:  "Test event",
-		CVEs:   []string{"CVE-2024-0001"},
-		Tags:   []string{"tlp:green"},
+		ID:    "test-123",
+		Title: "Test event",
+		CVEs:  []string{"CVE-2024-0001"},
+		Tags:  []string{"tlp:green"},
 		IOCs: []model.IOC{
-			{Type: model.IOCIPv4, Value: "8.8.8.8", Source: "misp"},                                  // public DNS — blocked
-			{Type: model.IOCIPv4, Value: "192.168.1.1", Source: "misp"},                              // private — blocked
-			{Type: model.IOCIPv4, Value: "45.153.241.187", Source: "misp"},                           // valid — allowed
-			{Type: model.IOCDomain, Value: "google.com", Source: "misp"},                            // CDN — blocked
-			{Type: model.IOCDomain, Value: "evil.xyz", Source: "misp"},                              // valid — allowed
-			{Type: model.IOCDomain, Value: "!!!invalid!!!", Source: "misp"},                         // invalid — dropped
+			{Type: model.IOCIPv4, Value: "8.8.8.8", Source: "misp"},         // public DNS — blocked
+			{Type: model.IOCIPv4, Value: "192.168.1.1", Source: "misp"},     // private — blocked
+			{Type: model.IOCIPv4, Value: "45.153.241.187", Source: "misp"},  // valid — allowed
+			{Type: model.IOCDomain, Value: "google.com", Source: "misp"},    // CDN — blocked
+			{Type: model.IOCDomain, Value: "evil.xyz", Source: "misp"},      // valid — allowed
+			{Type: model.IOCDomain, Value: "!!!invalid!!!", Source: "misp"}, // invalid — dropped
 		},
 	}
 
@@ -105,9 +105,9 @@ func TestTLPGate(t *testing.T) {
 	cs.Mock = true
 
 	event := model.ThreatEvent{
-		ID:     "test-tlp",
-		Title:  "TLP test",
-		Tags:   []string{"tlp:amber"},
+		ID:    "test-tlp",
+		Title: "TLP test",
+		Tags:  []string{"tlp:amber"},
 		IOCs: []model.IOC{
 			{Type: model.IOCDomain, Value: "evil.com", Source: "misp", Tags: []string{}},
 		},
@@ -129,9 +129,9 @@ func TestDedup(t *testing.T) {
 	cs.Mock = true
 
 	event := model.ThreatEvent{
-		ID:     "test-dedup",
-		Title:  "Dedup test",
-		Tags:   []string{"tlp:green"},
+		ID:    "test-dedup",
+		Title: "Dedup test",
+		Tags:  []string{"tlp:green"},
 		IOCs: []model.IOC{
 			{Type: model.IOCDomain, Value: "evil[.]com", Source: "misp"}, // defanged
 			{Type: model.IOCDomain, Value: "evil.com", Source: "misp"},   // clean — same
@@ -175,9 +175,9 @@ func TestNotifyRace(t *testing.T) {
 		go func(n int) {
 			defer wg.Done()
 			event := model.ThreatEvent{
-				ID:     "test-race-" + string(rune('a'+n%26)),
-				Title:  "Race test",
-				Tags:   []string{"tlp:green"},
+				ID:    "test-race-" + string(rune('a'+n%26)),
+				Title: "Race test",
+				Tags:  []string{"tlp:green"},
 				IOCs: []model.IOC{
 					{Type: model.IOCDomain, Value: "evil-" + string(rune('a'+n%26)) + ".com", Source: "misp"},
 				},
@@ -208,11 +208,11 @@ func TestPreventGate(t *testing.T) {
 	cs.Mock = true
 
 	event := model.ThreatEvent{
-		ID:     "test-prevent",
-		Title:  "Prevent gate test",
-		Tags:   []string{"tlp:green"},
+		ID:    "test-prevent",
+		Title: "Prevent gate test",
+		Tags:  []string{"tlp:green"},
 		IOCs: []model.IOC{
-			{Type: model.IOCDomain, Value: "evil.com", Source: "misp"},    // allowed for prevent
+			{Type: model.IOCDomain, Value: "evil.com", Source: "misp"},     // allowed for prevent
 			{Type: model.IOCIPv4, Value: "45.153.241.187", Source: "misp"}, // not in preventTypes
 		},
 	}

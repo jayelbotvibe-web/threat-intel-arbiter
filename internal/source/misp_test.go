@@ -85,8 +85,8 @@ func loadFixtures(t *testing.T, relativeDir string) map[string]json.RawMessage {
 
 	// Try relative to project root (works with go test ./internal/source/)
 	candidates := []string{
-		filepath.Join("..", "..", "testdata"),     // from internal/source/
-		filepath.Join("testdata"),                   // from project root
+		filepath.Join("..", "..", "testdata"), // from internal/source/
+		filepath.Join("testdata"),             // from project root
 	}
 
 	// Also try absolute path from the source file

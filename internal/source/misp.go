@@ -20,9 +20,9 @@ import (
 // MISPClient is a REST client for the MISP threat intelligence platform.
 // It handles HMAC-SHA256 request signing as required by MISP's API.
 type MISPClient struct {
-	BaseURL  string
-	APIKey   string
-	HTTP     *http.Client
+	BaseURL string
+	APIKey  string
+	HTTP    *http.Client
 }
 
 // NewMISPClient creates a new MISP API client.
@@ -125,12 +125,12 @@ type MISPGalaxyCluster struct {
 
 // MISPSighting is a sighting of an attribute by an organisation.
 type MISPSighting struct {
-	ID          string  `json:"id"`
-	AttributeID string  `json:"attribute_id"`
-	EventID     string  `json:"event_id"`
-	OrgID       string  `json:"org_id"`
-	DateSighting string `json:"date_sighting"`
-	Org         *MISPOrg `json:"Organisation"`
+	ID           string   `json:"id"`
+	AttributeID  string   `json:"attribute_id"`
+	EventID      string   `json:"event_id"`
+	OrgID        string   `json:"org_id"`
+	DateSighting string   `json:"date_sighting"`
+	Org          *MISPOrg `json:"Organisation"`
 }
 
 // MISPOrg is a MISP organisation reference.
