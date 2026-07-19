@@ -107,7 +107,7 @@ func TestParseRealTechStack(t *testing.T) {
 	// Parse the actual semiconductor tech stack CSV
 	// Use runtime.Caller to find the correct path regardless of test binary location
 	_, thisFile, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "config", "techstack.csv")
+	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "config", "techstack.csv.example")
 
 	apps, err := ParseTechStack(path)
 	if err != nil {

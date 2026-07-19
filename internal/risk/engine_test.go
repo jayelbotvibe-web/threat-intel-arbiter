@@ -17,7 +17,7 @@ import (
 func loadOrgCtx(t *testing.T) model.OrgContext {
 	t.Helper()
 	_, thisFile, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "config", "techstack.csv")
+	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "config", "techstack.csv.example")
 	apps, err := config.ParseTechStack(path)
 	if err != nil {
 		t.Fatalf("load tech stack: %v", err)
