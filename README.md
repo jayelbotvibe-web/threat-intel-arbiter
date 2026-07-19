@@ -141,7 +141,7 @@ Built-in single-page application — no framework, no build step, pure HTML/CSS/
 - Session cookie auth (HttpOnly, SameSite=Strict), 12-hour expiry
 - Password hashing: Argon2id with legacy SHA-256 upgrade on login
 - Session tokens: SHA-256 hashed at rest in SQLite
-- Default admin account seeded on first start with a random one-time password (printed to stdout). You are **forced to change it on first login** — no standing default credentials exist.
+- Default admin account seeded on first start with a random one-time password (printed to stdout). You should change it immediately via the Users panel — no standing default credentials exist.
 - Programmatic access via `X-Arbiter-Key` header (API key always has admin privileges)
 
 ---

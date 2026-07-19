@@ -1,17 +1,22 @@
 // Package risk — SSVC v2.1 Deployer decision tree.
 //
 // Implements the CMU/CISA Stakeholder-Specific Vulnerability Categorization
-// (SSVC) v2.1 decision tree for the Deployer role. This is a genuine decision
-// tree, not a score-to-label mapping.
+// (SSVC) v2.1 decision tree for the Deployer role. Outputs the four canonical
+// action labels: Act, Attend, Track*, Track.
+//
+// The tree covers all v2.1 Deployer decision paths including the four
+// Mission & Well-being levels (very_high, high, medium, low). The Automatable
+// decision point uses a conservative CVSS ≥ 7 heuristic; upgrade path is
+// parsing CVSS vector strings.
 //
 // Decision points:
 //  1. Exploitation — KEV/exploit tags → active; else → none
 //     (EPSS → PoC pathway reserved for Workstream 3)
 //  2. Exposure — internet-facing → open; matched internal → controlled;
 //     no match → small
-//  3. Automatable — CVSS ≥ 7 → yes (conservative heuristic);
-//     // ponytail: upgrade path is parsing CVSS vector strings
-//  4. Mission & Well-being — from asset criticality + data sensitivity
+//  3. Automatable — CVSS ≥ 7 → yes (conservative heuristic).
+//     Upgrade path: parse CVSS vector strings for attackVector/attackComplexity/privilegesRequired.
+//  4. Mission & Well-being — from asset criticality + data sensitivity + internet-facing
 //
 // Outputs: Act, Attend, Track*, Track (the canonical SSVC v2 labels).
 package risk
@@ -40,6 +45,11 @@ const (
 	ActionAttend    = "Attend"
 	ActionTrack     = "Track"
 	ActionTrackStar = "Track*"
+
+	missionVeryHigh = "very_high"
+	missionHigh     = "high"
+	missionMedium   = "medium"
+	missionLow      = "low"
 )
 
 // SSVCResult holds the output of the SSVC decision tree, including
@@ -93,16 +103,19 @@ func SSVCTree(event model.ThreatEvent, org model.OrgContext, matches []model.Mat
 			// active + open: proceed to automatable and mission
 			if automatable {
 				switch mission {
-				case "high":
+				case missionVeryHigh, missionHigh:
 					action = ActionAct
-					trace = "exploitation:active → exposure:open → automatable:yes → mission:high → Act"
+					trace = "exploitation:active → exposure:open → automatable:yes → mission:" + mission + " → Act"
 				default: // medium, low
 					action = ActionAttend
 					trace = "exploitation:active → exposure:open → automatable:yes → mission:medium/low → Attend"
 				}
 			} else {
 				switch mission {
-				case "low":
+				case missionVeryHigh:
+					action = ActionAct
+					trace = "exploitation:active → exposure:open → automatable:no → mission:very_high → Act"
+				case missionLow:
 					action = ActionTrackStar
 					trace = "exploitation:active → exposure:open → automatable:no → mission:low → Track*"
 				default: // high, medium
@@ -130,7 +143,7 @@ func determineExploitation(event model.ThreatEvent, matches []model.Match) strin
 			return explActive
 		}
 	}
-	// ponytail: EPSS ≥ threshold → PoC — reserved for Workstream 3
+	// EPSS ≥ threshold → PoC — reserved for Workstream 3
 	return explNone
 }
 
@@ -163,7 +176,7 @@ func determineExposure(org model.OrgContext, matches []model.Match) string {
 
 // determineAutomatable decides whether exploitation can be automated.
 //
-// ponytail: conservative heuristic — CVSS ≥ 7.0 assumes automatable.
+// Conservative heuristic — CVSS ≥ 7.0 assumes automatable.
 // Upgrade path: parse CVSS vector string for attackVector:Network +
 // attackComplexity:Low + privilegesRequired:None.
 func determineAutomatable(event model.ThreatEvent) bool {
@@ -171,11 +184,12 @@ func determineAutomatable(event model.ThreatEvent) bool {
 }
 
 // determineMissionImpact maps asset criticality and data sensitivity
-// to SSVC mission & well-being impact levels.
+// to SSVC mission & well-being impact levels (very_high, high, medium, low).
 func determineMissionImpact(org model.OrgContext, matches []model.Match) string {
 	hasCritical := false
 	hasHigh := false
 	hasSensitiveData := false
+	isInternetFacing := false
 
 	for _, m := range matches {
 		if m.AppName == "" {
@@ -186,6 +200,9 @@ func determineMissionImpact(org model.OrgContext, matches []model.Match) string 
 				switch app.Criticality {
 				case "critical":
 					hasCritical = true
+					if app.InternetFacing {
+						isInternetFacing = true
+					}
 				case "high":
 					hasHigh = true
 				}
@@ -196,11 +213,15 @@ func determineMissionImpact(org model.OrgContext, matches []model.Match) string 
 		}
 	}
 
+	// Very high: critical infrastructure asset, internet-facing, with sensitive data
+	if hasCritical && isInternetFacing && hasSensitiveData {
+		return missionVeryHigh
+	}
 	if hasCritical && hasSensitiveData {
-		return "high"
+		return missionHigh
 	}
 	if hasCritical || hasHigh {
-		return "medium"
+		return missionMedium
 	}
-	return "low"
+	return missionLow
 }

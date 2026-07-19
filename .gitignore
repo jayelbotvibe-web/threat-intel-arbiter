@@ -5,6 +5,9 @@ tmp/
 # Database
 data/*.db
 
+# Local config (tracked as .example, copy to use)
+config/techstack.csv
+
 # Secrets (never commit)
 *.env
 config/misp.env

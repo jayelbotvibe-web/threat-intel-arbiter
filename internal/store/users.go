@@ -66,7 +66,20 @@ func (db *DB) ListUsers() ([]User, error) {
 }
 
 // UpdateUser updates a user's password and/or role.
+// Blocks updates that would leave the system with zero admin users.
 func (db *DB) UpdateUser(username, password, role string) error {
+	if role != "admin" {
+		// Check if this is the last admin being demoted
+		var targetRole string
+		db.conn.QueryRow("SELECT role FROM users WHERE username = ?", username).Scan(&targetRole)
+		if targetRole == "admin" {
+			var adminCount int
+			db.conn.QueryRow("SELECT COUNT(*) FROM users WHERE role='admin' AND username != ?", username).Scan(&adminCount)
+			if adminCount == 0 {
+				return fmt.Errorf("cannot change role: would leave zero admin users")
+			}
+		}
+	}
 	if password != "" {
 		hash := hashPassword(password)
 		_, err := db.conn.Exec("UPDATE users SET password_hash=?, role=? WHERE username=?",
@@ -176,20 +189,51 @@ func verifyHash(password, stored string) bool {
 }
 
 func verifyArgon2(password, stored string) bool {
-	rest := strings.TrimPrefix(stored, argonPrefix)
-	parts := strings.SplitN(rest, "$", 2)
-	if len(parts) != 2 {
+	// Parse parameters from the stored hash string rather than using
+	// package constants, so verification stays correct if cost params
+	// ever change (or if hashes with different params coexist).
+	// Format: $argon2id$v=19$m=<mem>,t=<iter>,p=<threads>$<salt>$<hash>
+	rest := strings.TrimPrefix(stored, "$argon2id$v=19$")
+	if rest == stored {
+		return false // missing expected prefix
+	}
+	parts := strings.SplitN(rest, "$", 3)
+	if len(parts) != 3 {
 		return false
 	}
-	salt, err := base64.RawStdEncoding.DecodeString(parts[0])
+	params, saltB64, hashB64 := parts[0], parts[1], parts[2]
+
+	var memory uint32 = argonMemory
+	var iterations uint32 = argonTime
+	var threads uint8 = argonThreads
+	for _, p := range strings.Split(params, ",") {
+		kv := strings.SplitN(p, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		var v int
+		if _, err := fmt.Sscanf(kv[1], "%d", &v); err != nil {
+			continue
+		}
+		switch kv[0] {
+		case "m":
+			memory = uint32(v)
+		case "t":
+			iterations = uint32(v)
+		case "p":
+			threads = uint8(v)
+		}
+	}
+
+	salt, err := base64.RawStdEncoding.DecodeString(saltB64)
 	if err != nil {
 		return false
 	}
-	expected, err := base64.RawStdEncoding.DecodeString(parts[1])
+	expected, err := base64.RawStdEncoding.DecodeString(hashB64)
 	if err != nil {
 		return false
 	}
-	hash := argon2.IDKey([]byte(password), salt, argonTime, argonMemory, argonThreads, uint32(len(expected)))
+	hash := argon2.IDKey([]byte(password), salt, iterations, memory, threads, uint32(len(expected)))
 	return subtle.ConstantTimeCompare(hash, expected) == 1
 }
 

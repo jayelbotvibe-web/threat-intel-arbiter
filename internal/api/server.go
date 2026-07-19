@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"database/sql"
 	"embed"
 	"encoding/json"
@@ -137,7 +138,7 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		key := r.Header.Get("X-Arbiter-Key")
-		if key == "" || key != s.AdminKey {
+		if s.AdminKey == "" || subtle.ConstantTimeCompare([]byte(key), []byte(s.AdminKey)) != 1 {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
@@ -581,6 +582,19 @@ func configParseTechStack(r io.Reader) ([]model.App, error) {
 	return config.ParseTechStackReader(r)
 }
 
+// maskAdminKey safely masks an admin key for display in the settings API.
+// Shows last min(4, len) characters, or fully masks keys shorter than 4 chars.
+func maskAdminKey(key string) string {
+	if len(key) == 0 {
+		return ""
+	}
+	show := 4
+	if len(key) < 4 {
+		show = len(key)
+	}
+	return strings.Repeat("*", len(key)-show) + key[len(key)-show:]
+}
+
 // handleGetSettings returns all settings with secret values masked.
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	settings, err := s.DB.GetAllSettingsMasked()
@@ -594,7 +608,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 			settings = make(map[string]string)
 		}
 		if s.AdminKey != "" {
-			settings["admin_key_masked"] = "****" + s.AdminKey[len(s.AdminKey)-4:]
+			settings["admin_key_masked"] = maskAdminKey(s.AdminKey)
 		} else {
 			settings["admin_key_masked"] = ""
 		}
