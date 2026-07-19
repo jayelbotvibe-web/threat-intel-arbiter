@@ -29,6 +29,15 @@ type RiskWeights struct {
 	SeverityThresholds map[string]float64
 }
 
+// Contribution is a single (reason, delta) factor that fed a dimension score.
+// The dimension score is the capped sum of its contributions, and the
+// human-readable explanation is rendered from these same values — so the
+// breakdown always reconciles with the number it explains.
+type Contribution struct {
+	Reason string `json:"reason"`
+	Delta  int    `json:"delta"`
+}
+
 // ScoreResult holds the output of the risk engine.
 type ScoreResult struct {
 	Likelihood      int     `json:"likelihood"`
@@ -41,6 +50,37 @@ type ScoreResult struct {
 	Action          string  `json:"action"`
 	SSVCTrace       string  `json:"ssvc_trace"`
 	Explanation     string  `json:"explanation"`
+
+	// Per-dimension factors — the single source of truth that both the
+	// dimension score and the explanation are derived from.
+	LikelihoodFactors []Contribution `json:"likelihood_factors"`
+	ImpactFactors     []Contribution `json:"impact_factors"`
+	ExposureFactors   []Contribution `json:"exposure_factors"`
+	ConfidenceFactors []Contribution `json:"confidence_factors"`
+}
+
+// sumCapped sums a dimension's contributions and clamps to [0, max].
+func sumCapped(factors []Contribution, max int) int {
+	s := 0
+	for _, f := range factors {
+		s += f.Delta
+	}
+	if s > max {
+		s = max
+	}
+	if s < 0 {
+		s = 0
+	}
+	return s
+}
+
+// rawSum returns the uncapped sum, used to disclose when a cap was applied.
+func rawSum(factors []Contribution) int {
+	s := 0
+	for _, f := range factors {
+		s += f.Delta
+	}
+	return s
 }
 
 // NewEngine creates a risk scoring engine with defaults.
@@ -87,10 +127,15 @@ func defaultWeights() RiskWeights {
 func (e *Engine) Score(event model.ThreatEvent, org model.OrgContext, matches []model.Match) ScoreResult {
 	var result ScoreResult
 
-	result.Likelihood = e.computeLikelihood(event, matches)
-	result.Impact = e.computeImpact(event, org, matches)
-	result.Exposure = e.computeExposure(event, org, matches)
-	result.Confidence = e.computeConfidence(event, matches)
+	result.LikelihoodFactors = e.likelihoodFactors(event, matches)
+	result.ImpactFactors = e.impactFactors(event, org, matches)
+	result.ExposureFactors = e.exposureFactors(event, org, matches)
+	result.ConfidenceFactors = e.confidenceFactors(event, matches)
+
+	result.Likelihood = sumCapped(result.LikelihoodFactors, e.cfg.MaxLikelihood)
+	result.Impact = sumCapped(result.ImpactFactors, e.cfg.MaxImpact)
+	result.Exposure = sumCapped(result.ExposureFactors, e.cfg.MaxExposure)
+	result.Confidence = sumCapped(result.ConfidenceFactors, e.cfg.MaxConfidence)
 
 	riskScore := float64(result.Likelihood*result.Impact*result.Exposure) /
 		float64(e.cfg.MaxLikelihood*e.cfg.MaxImpact*e.cfg.MaxExposure)
@@ -108,61 +153,58 @@ func (e *Engine) Score(event model.ThreatEvent, org model.OrgContext, matches []
 	return result
 }
 
-func (e *Engine) computeLikelihood(event model.ThreatEvent, matches []model.Match) int {
-	score := 0
+// likelihoodFactors returns the contributions that make up the likelihood
+// dimension. Each entry was actually applied, so the list reconciles with
+// sumCapped(...) exactly (barring the disclosed cap).
+func (e *Engine) likelihoodFactors(event model.ThreatEvent, matches []model.Match) []Contribution {
+	var f []Contribution
 
+	kev := false
 	for _, m := range matches {
 		if m.KEVMatch {
-			score += 3
+			f = append(f, Contribution{"Active exploitation confirmed by CISA KEV", 3})
+			kev = true
 			break
 		}
 	}
-	for _, tag := range event.Tags {
-		if tag == "exploit:in-the-wild" {
-			if score < 3 {
-				score += 3
+	// exploit:in-the-wild only counts when KEV did not already establish active
+	// exploitation (avoids double-counting the same signal).
+	if !kev {
+		for _, tag := range event.Tags {
+			if tag == "exploit:in-the-wild" {
+				f = append(f, Contribution{"Active exploitation tag (exploit:in-the-wild)", 3})
+				break
 			}
-			break
 		}
 	}
-
 	for _, tag := range event.Tags {
 		if tag == "exploit:weaponized" {
-			score += 2
+			f = append(f, Contribution{"Weaponization confirmed (exploit:weaponized)", 2})
 			break
 		}
 	}
-
 	if len(event.ThreatActors) > 0 {
-		score += 1
+		f = append(f, Contribution{"Threat actor activity: " + strings.Join(event.ThreatActors, ", "), 1})
 	}
-
 	if time.Since(event.Timestamp) < 7*24*time.Hour {
-		score += 1
+		f = append(f, Contribution{"Recent publication (within 7 days)", 1})
 	}
-
-	if score > e.cfg.MaxLikelihood {
-		score = e.cfg.MaxLikelihood
-	}
-	if score < 0 {
-		score = 0
-	}
-	return score
+	return f
 }
 
-func (e *Engine) computeImpact(event model.ThreatEvent, org model.OrgContext, matches []model.Match) int {
-	score := 0
+func (e *Engine) impactFactors(event model.ThreatEvent, org model.OrgContext, matches []model.Match) []Contribution {
+	var f []Contribution
 
-	if event.CVSS >= 9.0 {
-		score += 3
-	} else if event.CVSS >= 7.0 {
-		score += 2
-	} else if event.CVSS >= 4.0 {
-		score += 1
+	switch {
+	case event.CVSS >= 9.0:
+		f = append(f, Contribution{fmt.Sprintf("CVSS %.1f (critical)", event.CVSS), 3})
+	case event.CVSS >= 7.0:
+		f = append(f, Contribution{fmt.Sprintf("CVSS %.1f (high)", event.CVSS), 2})
+	case event.CVSS >= 4.0:
+		f = append(f, Contribution{fmt.Sprintf("CVSS %.1f (medium)", event.CVSS), 1})
 	}
 
-	hasCritical := false
-	hasHigh := false
+	hasCritical, hasHigh := false, false
 	for _, m := range matches {
 		if m.AppName == "" {
 			continue
@@ -179,40 +221,35 @@ func (e *Engine) computeImpact(event model.ThreatEvent, org model.OrgContext, ma
 		}
 	}
 	if hasCritical {
-		score += 2
+		f = append(f, Contribution{"Matched a critical-infrastructure asset", 2})
 	} else if hasHigh {
-		score += 1
+		f = append(f, Contribution{"Matched a high-criticality asset", 1})
 	}
 
-	if score == 0 && len(matches) > 0 {
-		score = 1
+	// Baseline: a matched asset carries at least some impact even without a
+	// CVSS or criticality signal.
+	if rawSum(f) == 0 && len(matches) > 0 {
+		f = append(f, Contribution{"Matched asset in tech stack (baseline)", 1})
 	}
 
-	hasSensitive := false
 	for _, m := range matches {
 		if m.AppName == "" {
 			continue
 		}
 		for _, app := range org.TechStack {
 			if app.Name == m.AppName && (app.DataSensitivity == "critical" || app.DataSensitivity == "high") {
-				hasSensitive = true
+				f = append(f, Contribution{"Matched asset handles sensitive data", 1})
+				return f
 			}
 		}
 	}
-	if hasSensitive {
-		score += 1
-	}
-
-	if score > e.cfg.MaxImpact {
-		score = e.cfg.MaxImpact
-	}
-	return score
+	return f
 }
 
-func (e *Engine) computeExposure(event model.ThreatEvent, org model.OrgContext, matches []model.Match) int {
-	score := 0
+func (e *Engine) exposureFactors(event model.ThreatEvent, org model.OrgContext, matches []model.Match) []Contribution {
+	var f []Contribution
 
-	hasAnyMatch := false
+	hasAnyMatch, internetFacing := false, false
 	for _, m := range matches {
 		if m.AppName == "" {
 			continue
@@ -221,53 +258,46 @@ func (e *Engine) computeExposure(event model.ThreatEvent, org model.OrgContext, 
 			if app.Name == m.AppName {
 				hasAnyMatch = true
 				if app.InternetFacing {
-					score += 2
-					goto checkCred
+					internetFacing = true
 				}
 			}
 		}
 	}
-checkCred:
-
-	if score == 0 && (hasAnyMatch || len(matches) > 0) {
-		score = 1
+	if internetFacing {
+		f = append(f, Contribution{"Matched asset is internet-facing", 2})
+	} else if hasAnyMatch || len(matches) > 0 {
+		f = append(f, Contribution{"Matched asset in tech stack (baseline)", 1})
 	}
 
 	for _, tag := range event.Tags {
 		if strings.Contains(tag, "phishing") || strings.Contains(tag, "credential") {
-			score += 1
+			f = append(f, Contribution{"Phishing/credential-theft vector", 1})
 			break
 		}
 	}
-
-	if score > e.cfg.MaxExposure {
-		score = e.cfg.MaxExposure
-	}
-	return score
+	return f
 }
 
-func (e *Engine) computeConfidence(event model.ThreatEvent, matches []model.Match) int {
-	score := 0
+func (e *Engine) confidenceFactors(event model.ThreatEvent, matches []model.Match) []Contribution {
+	var f []Contribution
 
 	switch event.SourceConfidence {
 	case "high":
-		score += 3
+		f = append(f, Contribution{"Source confidence: high", 3})
 	case "medium":
-		score += 2
+		f = append(f, Contribution{"Source confidence: medium", 2})
 	case "low":
-		score += 0
+		// contributes nothing
 	default:
-		score += 1
+		f = append(f, Contribution{"Source confidence: unspecified", 1})
 	}
 
-	if score < e.cfg.MaxConfidence {
-		score += 1
+	// Baseline bump, matching the original model: applied only while the running
+	// total is below the cap.
+	if rawSum(f) < e.cfg.MaxConfidence {
+		f = append(f, Contribution{"Baseline reliability", 1})
 	}
-
-	if score > e.cfg.MaxConfidence {
-		score = e.cfg.MaxConfidence
-	}
-	return score
+	return f
 }
 
 // severityLabel maps a risk score to a severity label using configured thresholds.
@@ -301,69 +331,22 @@ func (e *Engine) confidenceLabel(score int) string {
 }
 
 // Explain generates a human-readable explanation from the score result.
+// It renders the same Contribution lists that produced each dimension score,
+// so the "+N" factors always reconcile with the number they explain.
 func (e *Engine) Explain(result ScoreResult, event model.ThreatEvent, matches []model.Match, org model.OrgContext) string {
 	var b strings.Builder
 
 	b.WriteString(fmt.Sprintf("%s (confidence: %s)\n\n", strings.ToUpper(result.Severity), result.ConfidenceLabel))
 	b.WriteString(fmt.Sprintf("%s\n\n", event.Title))
 
-	b.WriteString(fmt.Sprintf("Likelihood: %d/%d\n", result.Likelihood, e.cfg.MaxLikelihood))
-	for _, m := range matches {
-		if m.KEVMatch {
-			b.WriteString("  • Active exploitation confirmed by CISA KEV (+3)\n")
-		}
-	}
-	for _, tag := range event.Tags {
-		if tag == "exploit:in-the-wild" {
-			b.WriteString("  • Active exploitation tag (+3)\n")
-		}
-		if tag == "exploit:weaponized" {
-			b.WriteString("  • Weaponization confirmed (+2)\n")
-		}
-	}
-	if len(event.ThreatActors) > 0 {
-		b.WriteString(fmt.Sprintf("  • Threat actor activity: %s (+1)\n", strings.Join(event.ThreatActors, ", ")))
-	}
-	b.WriteString("  • Recent publication (+1)\n")
-
-	b.WriteString(fmt.Sprintf("\nImpact: %d/%d\n", result.Impact, e.cfg.MaxImpact))
-	if event.CVSS >= 9.0 {
-		b.WriteString(fmt.Sprintf("  • CVSS %.1f (+3)\n", event.CVSS))
-	} else if event.CVSS >= 7.0 {
-		b.WriteString(fmt.Sprintf("  • CVSS %.1f (+2)\n", event.CVSS))
-	}
-	for _, m := range matches {
-		if m.AppName != "" {
-			for _, app := range org.TechStack {
-				if app.Name == m.AppName && app.Criticality == "critical" {
-					b.WriteString(fmt.Sprintf("  • %s is critical infrastructure (+2)\n", app.Name))
-				}
-			}
-		}
-	}
-
-	b.WriteString(fmt.Sprintf("\nExposure: %d/%d\n", result.Exposure, e.cfg.MaxExposure))
-	for _, m := range matches {
-		if m.AppName != "" {
-			for _, app := range org.TechStack {
-				if app.Name == m.AppName && app.InternetFacing {
-					b.WriteString(fmt.Sprintf("  • %s is internet-facing (+2)\n", app.Name))
-				}
-			}
-		}
-	}
-
-	b.WriteString(fmt.Sprintf("\nConfidence: %d/%d (%s)\n", result.Confidence, e.cfg.MaxConfidence, result.ConfidenceLabel))
-	b.WriteString(fmt.Sprintf("  • Source: %s (%s confidence)\n", event.Source, event.SourceConfidence))
-	for _, m := range matches {
-		if m.KEVMatch {
-			b.WriteString("  • CISA KEV confirmed (+3)\n")
-		}
-	}
-	if event.Source == "misp" {
-		b.WriteString("  • MISP community trust (+1)\n")
-	}
-	b.WriteString("  • Default baseline (+1)\n")
+	writeDimension(&b, "Likelihood", result.Likelihood, e.cfg.MaxLikelihood, result.LikelihoodFactors)
+	b.WriteString("\n")
+	writeDimension(&b, "Impact", result.Impact, e.cfg.MaxImpact, result.ImpactFactors)
+	b.WriteString("\n")
+	writeDimension(&b, "Exposure", result.Exposure, e.cfg.MaxExposure, result.ExposureFactors)
+	b.WriteString("\n")
+	writeDimension(&b, fmt.Sprintf("Confidence (%s)", result.ConfidenceLabel),
+		result.Confidence, e.cfg.MaxConfidence, result.ConfidenceFactors)
 
 	b.WriteString(fmt.Sprintf("\nAction: %s\n", result.Action))
 	b.WriteString(fmt.Sprintf("  • SSVC path: %s\n", result.SSVCTrace))
@@ -374,4 +357,21 @@ func (e *Engine) Explain(result ScoreResult, event model.ThreatEvent, matches []
 		result.RiskScore, strings.ToUpper(result.Severity)))
 
 	return b.String()
+}
+
+// writeDimension renders one dimension: its score, each contributing factor
+// with its delta, and — when the raw factor sum exceeds the cap — a note
+// disclosing that the score was capped. This keeps the breakdown honest.
+func writeDimension(b *strings.Builder, name string, score, max int, factors []Contribution) {
+	b.WriteString(fmt.Sprintf("%s: %d/%d\n", name, score, max))
+	if len(factors) == 0 {
+		b.WriteString("  • No contributing factors\n")
+		return
+	}
+	for _, f := range factors {
+		b.WriteString(fmt.Sprintf("  • %s (%+d)\n", f.Reason, f.Delta))
+	}
+	if raw := rawSum(factors); raw > max {
+		b.WriteString(fmt.Sprintf("  • (factors sum to %d, capped at %d)\n", raw, max))
+	}
 }
