@@ -27,7 +27,7 @@ var orgCtx = model.OrgContext{
 func loadTestTechStack(t *testing.T) []model.App {
 	t.Helper()
 	_, thisFile, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "config", "techstack.csv")
+	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "config", "techstack.csv.example")
 	apps, err := config.ParseTechStack(path)
 	if err != nil {
 		t.Fatalf("load tech stack: %v", err)

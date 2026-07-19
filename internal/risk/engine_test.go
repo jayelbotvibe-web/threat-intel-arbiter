@@ -17,7 +17,7 @@ import (
 func loadOrgCtx(t *testing.T) model.OrgContext {
 	t.Helper()
 	_, thisFile, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "config", "techstack.csv")
+	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "config", "techstack.csv.example")
 	apps, err := config.ParseTechStack(path)
 	if err != nil {
 		t.Fatalf("load tech stack: %v", err)
@@ -233,10 +233,11 @@ func TestScoreEdges(t *testing.T) {
 // ── SSVC v2.1 Decision Tree Tests ──
 
 func TestSSVC_KEV_Floored(t *testing.T) {
-	// Regression: KEV-listed CVE + lowest-criticality internal app
-	// must NOT score below Attend. The multiplicative formula would
-	// give this ~0.05 (low), but the SSVC tree guarantees Attend
-	// because exploitation=active + exposure=controlled → Attend.
+	// Regression: a KEV-listed CVE (exploitation=active) must never be Track
+	// (defer) — no active-exploitation leaf in the CERT/CISA Deployer table
+	// yields defer. For this lowest-impact internal case (active + controlled
+	// exposure + automatable:no + mission:low) the authoritative outcome is
+	// "scheduled" → Track*, above the multiplicative score's ~0.05 (low).
 	engine := NewEngine()
 
 	event := model.ThreatEvent{
@@ -262,9 +263,12 @@ func TestSSVC_KEV_Floored(t *testing.T) {
 	t.Logf("KEV floor: severity=%s action=%s score=%.2f trace=%s",
 		result.Severity, result.Action, result.RiskScore, result.SSVCTrace)
 
-	// The SSVC action must be Attend or higher — never Track for KEV
-	if result.Action != ActionAttend && result.Action != ActionAct {
-		t.Errorf("KEV CVE + internal app action = %s, want Attend or Act (SSVC floor)", result.Action)
+	// Active exploitation is never Track (defer); here it is exactly Track*.
+	if result.Action == ActionTrack {
+		t.Errorf("KEV CVE (active exploitation) action = Track, but no active leaf defers")
+	}
+	if result.Action != ActionTrackStar {
+		t.Errorf("active + controlled + automatable:no + mission:low action = %s, want Track*", result.Action)
 	}
 
 	// Score from multiplicative formula may be low — that's expected
@@ -356,5 +360,76 @@ func TestSSVC_EmptyEvent(t *testing.T) {
 
 	if result.Action != ActionTrack {
 		t.Errorf("empty event action = %s, want Track", result.Action)
+	}
+}
+
+func TestSSVC_VeryHigh_Act(t *testing.T) {
+	// Very high mission impact = critical app + internet-facing + critical data.
+	// With KEV + CVSS ≥ 7 → automatable:yes → Act.
+	engine := NewEngine()
+
+	event := model.ThreatEvent{
+		ID:               "CVE-2024-88888",
+		CVEs:             []string{"CVE-2024-88888"},
+		CVSS:             7.5,
+		SourceConfidence: "high",
+		Title:            "Critical RCE in Internet-Facing CriticalApp with Sensitive Data",
+	}
+	org := model.OrgContext{
+		TechStack: []model.App{{
+			Name: "CriticalApp", Criticality: "critical",
+			InternetFacing: true, DataSensitivity: "critical",
+		}},
+	}
+	matches := []model.Match{
+		{KEVMatch: true, AppName: "CriticalApp", Matcher: "KEVMatcher"},
+		{AppName: "CriticalApp", Matcher: "CVEMatcher"},
+	}
+
+	result := engine.Score(event, org, matches)
+
+	t.Logf("very_high: severity=%s action=%s score=%.2f trace=%s",
+		result.Severity, result.Action, result.RiskScore, result.SSVCTrace)
+
+	if result.Action != ActionAct {
+		t.Errorf("very_high mission case action = %s, want Act", result.Action)
+	}
+	if !strings.Contains(result.SSVCTrace, "very_high") {
+		t.Errorf("trace should mention very_high: %s", result.SSVCTrace)
+	}
+}
+
+func TestSSVC_High_Autowired_Act(t *testing.T) {
+	// Not internet-facing = mission:high (not very_high).
+	// But automatable:no + mission:high + exposure:open → Attend (not Act).
+	// Only very_high + automatable:no → Act.
+	engine := NewEngine()
+
+	event := model.ThreatEvent{
+		ID:               "CVE-2024-77777",
+		CVEs:             []string{"CVE-2024-77777"},
+		CVSS:             5.0, // < 7 → automatable:no
+		SourceConfidence: "high",
+		Title:            "Critical RCE in Internet-Facing CriticalApp",
+	}
+	org := model.OrgContext{
+		TechStack: []model.App{{
+			Name: "CriticalApp", Criticality: "critical",
+			InternetFacing: true, DataSensitivity: "critical", // very_high
+		}},
+	}
+	matches := []model.Match{
+		{KEVMatch: true, AppName: "CriticalApp", Matcher: "KEVMatcher"},
+		{AppName: "CriticalApp", Matcher: "CVEMatcher"},
+	}
+
+	result := engine.Score(event, org, matches)
+
+	t.Logf("very_high_automatable_no: severity=%s action=%s score=%.2f trace=%s",
+		result.Severity, result.Action, result.RiskScore, result.SSVCTrace)
+
+	// automatable:no + very_high + exposure:open → Act (SSVC v2.1)
+	if result.Action != ActionAct {
+		t.Errorf("very_high + automatable:no action = %s, want Act", result.Action)
 	}
 }

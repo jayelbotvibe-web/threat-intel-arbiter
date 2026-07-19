@@ -2,11 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/store"
 )
@@ -221,5 +223,66 @@ func TestReaderSettingsMasksWebhooks(t *testing.T) {
 			t.Errorf("email target incorrectly masked: %s", email)
 		}
 		t.Logf("email_target: %s (expected unmasked)", email)
+	}
+}
+
+// TestRateLimiterEviction verifies that the rate limiter's background evictor
+// prunes stale keys to prevent memory-exhaustion DoS from attacker-controlled
+// username/IP flooding.
+func TestRateLimiterEviction(t *testing.T) {
+	rl := newRateLimiter()
+
+	// Inject many distinct keys with old timestamps
+	oldTime := time.Now().Add(-10 * time.Minute) // well outside the 5m window
+	rl.mu.Lock()
+	for i := 0; i < 500; i++ {
+		key := "user:attacker-" + fmt.Sprint(i)
+		rl.attempts[key] = []time.Time{oldTime}
+	}
+	rl.mu.Unlock()
+
+	if rl.size() != 500 {
+		t.Fatalf("expected 500 keys after injection, got %d", rl.size())
+	}
+
+	// Trigger eviction directly
+	rl.evict()
+
+	// All 500 keys should be gone — timestamps are outside the window
+	remaining := rl.size()
+	if remaining != 0 {
+		t.Errorf("expected 0 keys after eviction of stale entries, got %d", remaining)
+	}
+
+	// Add one fresh key — should survive eviction
+	rl.allow("user:valid-user", 20, 5*time.Minute)
+	rl.evict()
+	if rl.size() != 1 {
+		t.Errorf("expected 1 fresh key to survive eviction, got %d", rl.size())
+	}
+}
+
+// TestMaskAdminKey verifies safe masking of the admin key for /api/settings
+// responses, including short and empty keys that could panic on slice bounds.
+func TestMaskAdminKey(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+		want string
+	}{
+		{"empty", "", ""},
+		{"one char", "x", "x"}, // fully shown since len < 4
+		{"three chars", "abc", "abc"},
+		{"four chars", "abcd", "abcd"}, // exactly 4 = show all
+		{"five chars", "abcde", "*bcde"},
+		{"long key", "secret-admin-key-12345", "******************2345"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := maskAdminKey(tt.key)
+			if got != tt.want {
+				t.Errorf("maskAdminKey(%q) = %q, want %q", tt.key, got, tt.want)
+			}
+		})
 	}
 }

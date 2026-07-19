@@ -17,7 +17,7 @@ import (
 func loadOrgCtx(t *testing.T) model.OrgContext {
 	t.Helper()
 	_, thisFile, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "config", "techstack.csv")
+	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "config", "techstack.csv.example")
 	apps, _ := config.ParseTechStack(path)
 	return model.OrgContext{
 		OrgID: "default", Name: "NanoFab Semiconductor Inc.",

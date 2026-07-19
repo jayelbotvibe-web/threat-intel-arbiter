@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -236,7 +237,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		// Fall back to admin API key for programmatic access
-		if s.AdminKey != "" && r.Header.Get("X-Arbiter-Key") == s.AdminKey {
+		if s.AdminKey != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Arbiter-Key")), []byte(s.AdminKey)) == 1 {
 			next(w, r)
 			return
 		}
@@ -253,7 +254,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// API key always has admin privileges
-		if s.AdminKey != "" && r.Header.Get("X-Arbiter-Key") == s.AdminKey {
+		if s.AdminKey != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Arbiter-Key")), []byte(s.AdminKey)) == 1 {
 			next(w, r)
 			return
 		}

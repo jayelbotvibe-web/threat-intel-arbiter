@@ -1,22 +1,35 @@
-// Package risk — SSVC v2.1 Deployer decision tree.
+// Package risk — SSVC Deployer decision tree.
 //
-// Implements the CMU/CISA Stakeholder-Specific Vulnerability Categorization
-// (SSVC) v2.1 decision tree for the Deployer role. This is a genuine decision
-// tree, not a score-to-label mapping.
+// Implements the complete Stakeholder-Specific Vulnerability Categorization
+// (SSVC) Deployer decision table — all 72 combinations of the four decision
+// points, not a subset:
 //
-// Decision points:
-//  1. Exploitation — KEV/exploit tags → active; else → none
-//     (EPSS → PoC pathway reserved for Workstream 3)
-//  2. Exposure — internet-facing → open; matched internal → controlled;
-//     no match → small
-//  3. Automatable — CVSS ≥ 7 → yes (conservative heuristic);
-//     // ponytail: upgrade path is parsing CVSS vector strings
-//  4. Mission & Well-being — from asset criticality + data sensitivity
+//	Exploitation {none, poc, active}
+//	  × Exposure {small, controlled, open}
+//	  × Automatable {no, yes}
+//	  × Human Impact / Mission & Well-being {low, medium, high, very_high}
 //
-// Outputs: Act, Attend, Track*, Track (the canonical SSVC v2 labels).
+// Each leaf outcome is taken verbatim from the published CERT/CC SSVC Deployer
+// tree and reported using CISA's Deployer action labels. The two label sets are
+// the same four ordinal priority tiers under different names:
+//
+//	defer → Track   scheduled → Track*   out-of-cycle → Attend   immediate → Act
+//
+// Decision points are derived from the available data:
+//  1. Exploitation — KEV match or exploit:in-the-wild tag → active; else none.
+//     (EPSS → poc pathway reserved for a later workstream.)
+//  2. Exposure — internet-facing match → open; other match → controlled; none → small.
+//  3. Automatable — CVSS ≥ 7 heuristic (upgrade path: parse the CVSS vector).
+//  4. Mission & Well-being — from asset criticality + data sensitivity + exposure.
+//
+// Sources:
+//   - https://certcc.github.io/SSVC/howto/deployer_tree/
+//   - https://www.cisa.gov/stakeholder-specific-vulnerability-categorization-ssvc
 package risk
 
 import (
+	"fmt"
+
 	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/model"
 )
 
@@ -40,6 +53,11 @@ const (
 	ActionAttend    = "Attend"
 	ActionTrack     = "Track"
 	ActionTrackStar = "Track*"
+
+	missionVeryHigh = "very_high"
+	missionHigh     = "high"
+	missionMedium   = "medium"
+	missionLow      = "low"
 )
 
 // SSVCResult holds the output of the SSVC decision tree, including
@@ -49,71 +67,76 @@ type SSVCResult struct {
 	Trace  string `json:"trace"`
 }
 
-// SSVCTree evaluates the SSVC v2.1 Deployer decision tree.
-//
-// The tree is evaluated top-down: exploitation → exposure → automatable
-// → mission & well-being. Each decision point is determined from the
-// available data (event, org, matches).
+// deployerOutcomes is the CERT/CC SSVC Deployer decision table (72 leaves),
+// indexed by exploitation*24 + exposure*8 + automatable*4 + humanImpact.
+// Iteration order: exploitation{none,poc,active} × exposure{small,controlled,
+// open} × automatable{no,yes} × humanImpact{low,medium,high,very_high}.
+// Letters are the CERT/CC outcomes: D=defer, S=scheduled, O=out-of-cycle,
+// I=immediate. The table is monotonic — the outcome never decreases as any
+// single decision point worsens (enforced by TestSSVC_Monotonic).
+// Rows are ordered exposure-outer, automatable-inner; the four letters in each
+// group are human impact low, medium, high, very_high.
+var deployerOutcomes = []byte(
+	// exploitation:none
+	"DDSS" + "DSSS" + // small:      no, yes
+		"DSSS" + "SSSS" + // controlled: no, yes
+		"DSSS" + "SSSO" + // open:       no, yes
+		// exploitation:poc
+		"DSSS" + "SSSS" + // small
+		"DSSS" + "SSSO" + // controlled
+		"SSSO" + "SSOO" + // open
+		// exploitation:active
+		"SSOO" + "SOOO" + // small
+		"SSOO" + "OOOO" + // controlled
+		"SOOI" + "OOII") // open
+
+var (
+	explIndex     = map[string]int{explNone: 0, explPoC: 1, explActive: 2}
+	exposureIndex = map[string]int{expSmall: 0, expControlled: 1, expOpen: 2}
+	missionIndex  = map[string]int{missionLow: 0, missionMedium: 1, missionHigh: 2, missionVeryHigh: 3}
+
+	// certToAction maps CERT/CC Deployer outcomes to CISA action labels.
+	certToAction = map[byte]string{'D': ActionTrack, 'S': ActionTrackStar, 'O': ActionAttend, 'I': ActionAct}
+	certName     = map[byte]string{'D': "defer", 'S': "scheduled", 'O': "out-of-cycle", 'I': "immediate"}
+)
+
+// SSVCTree evaluates the full SSVC Deployer decision table for an event.
 func SSVCTree(event model.ThreatEvent, org model.OrgContext, matches []model.Match) SSVCResult {
 	exploitation := determineExploitation(event, matches)
 	exposure := determineExposure(org, matches)
 	automatable := determineAutomatable(event)
 	mission := determineMissionImpact(org, matches)
 
-	var action string
-	var trace string
-
-	switch exploitation {
-	case explNone:
-		action = ActionTrack
-		trace = "exploitation:none → Track"
-
-	case explPoC:
-		switch exposure {
-		case expSmall:
-			action = ActionTrack
-			trace = "exploitation:PoC → exposure:small → Track"
-		case expControlled:
-			action = ActionAttend
-			trace = "exploitation:PoC → exposure:controlled → Attend"
-		case expOpen:
-			action = ActionAttend
-			trace = "exploitation:PoC → exposure:open → Attend"
-		}
-
-	case explActive:
-		switch exposure {
-		case expSmall:
-			action = ActionAttend
-			trace = "exploitation:active → exposure:small → Attend"
-		case expControlled:
-			action = ActionAttend
-			trace = "exploitation:active → exposure:controlled → Attend"
-		case expOpen:
-			// active + open: proceed to automatable and mission
-			if automatable {
-				switch mission {
-				case "high":
-					action = ActionAct
-					trace = "exploitation:active → exposure:open → automatable:yes → mission:high → Act"
-				default: // medium, low
-					action = ActionAttend
-					trace = "exploitation:active → exposure:open → automatable:yes → mission:medium/low → Attend"
-				}
-			} else {
-				switch mission {
-				case "low":
-					action = ActionTrackStar
-					trace = "exploitation:active → exposure:open → automatable:no → mission:low → Track*"
-				default: // high, medium
-					action = ActionAttend
-					trace = "exploitation:active → exposure:open → automatable:no → mission:high/medium → Attend"
-				}
-			}
-		}
-	}
+	cert := deployerOutcome(exploitation, exposure, automatable, mission)
+	action := certToAction[cert]
+	trace := fmt.Sprintf("exploitation:%s → exposure:%s → automatable:%s → mission:%s → %s (%s)",
+		exploitation, exposure, yesNo(automatable), mission, action, certName[cert])
 
 	return SSVCResult{Action: action, Trace: trace}
+}
+
+// deployerOutcome looks up the CERT/CC Deployer outcome letter for the given
+// decision-point values. Unrecognized inputs fall back to the least-urgent
+// tier so a scoring gap can never inflate priority.
+func deployerOutcome(exploitation, exposure string, automatable bool, mission string) byte {
+	e, ok1 := explIndex[exploitation]
+	x, ok2 := exposureIndex[exposure]
+	h, ok3 := missionIndex[mission]
+	if !ok1 || !ok2 || !ok3 {
+		return 'D'
+	}
+	a := 0
+	if automatable {
+		a = 1
+	}
+	return deployerOutcomes[e*24+x*8+a*4+h]
+}
+
+func yesNo(b bool) string {
+	if b {
+		return "yes"
+	}
+	return "no"
 }
 
 // determineExploitation decides the exploitation state from event data.
@@ -130,7 +153,7 @@ func determineExploitation(event model.ThreatEvent, matches []model.Match) strin
 			return explActive
 		}
 	}
-	// ponytail: EPSS ≥ threshold → PoC — reserved for Workstream 3
+	// EPSS ≥ threshold → PoC — reserved for Workstream 3
 	return explNone
 }
 
@@ -163,7 +186,7 @@ func determineExposure(org model.OrgContext, matches []model.Match) string {
 
 // determineAutomatable decides whether exploitation can be automated.
 //
-// ponytail: conservative heuristic — CVSS ≥ 7.0 assumes automatable.
+// Conservative heuristic — CVSS ≥ 7.0 assumes automatable.
 // Upgrade path: parse CVSS vector string for attackVector:Network +
 // attackComplexity:Low + privilegesRequired:None.
 func determineAutomatable(event model.ThreatEvent) bool {
@@ -171,11 +194,12 @@ func determineAutomatable(event model.ThreatEvent) bool {
 }
 
 // determineMissionImpact maps asset criticality and data sensitivity
-// to SSVC mission & well-being impact levels.
+// to SSVC mission & well-being impact levels (very_high, high, medium, low).
 func determineMissionImpact(org model.OrgContext, matches []model.Match) string {
 	hasCritical := false
 	hasHigh := false
 	hasSensitiveData := false
+	isInternetFacing := false
 
 	for _, m := range matches {
 		if m.AppName == "" {
@@ -186,6 +210,9 @@ func determineMissionImpact(org model.OrgContext, matches []model.Match) string 
 				switch app.Criticality {
 				case "critical":
 					hasCritical = true
+					if app.InternetFacing {
+						isInternetFacing = true
+					}
 				case "high":
 					hasHigh = true
 				}
@@ -196,11 +223,15 @@ func determineMissionImpact(org model.OrgContext, matches []model.Match) string 
 		}
 	}
 
+	// Very high: critical infrastructure asset, internet-facing, with sensitive data
+	if hasCritical && isInternetFacing && hasSensitiveData {
+		return missionVeryHigh
+	}
 	if hasCritical && hasSensitiveData {
-		return "high"
+		return missionHigh
 	}
 	if hasCritical || hasHigh {
-		return "medium"
+		return missionMedium
 	}
-	return "low"
+	return missionLow
 }
