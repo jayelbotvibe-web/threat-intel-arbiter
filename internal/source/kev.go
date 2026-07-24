@@ -98,6 +98,10 @@ type KEVPoller struct {
 	Client   *KEVClient
 	Events   chan<- model.ThreatEvent
 	Interval time.Duration
+	// OnCatalog, if set, is called with the full list of CVE IDs from each
+	// successful fetch — before events are enqueued, so it runs even if the
+	// queue is full. Used to keep the KEVMatcher in sync with the live catalog.
+	OnCatalog func([]string)
 }
 
 // Run starts the KEV polling loop. Blocks until ctx is cancelled.
@@ -127,6 +131,16 @@ func (p *KEVPoller) fetchAndSend() {
 	}
 
 	log.Printf("kev poller: fetched %d entries", len(entries))
+
+	// Refresh the KEV matcher's known-exploited set from the live catalog
+	// first, so it is populated even if the event queue is saturated.
+	if p.OnCatalog != nil {
+		cveIDs := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			cveIDs = append(cveIDs, entry.CVEID)
+		}
+		p.OnCatalog(cveIDs)
+	}
 
 	for _, entry := range entries {
 		event := NormalizeKEV(entry)

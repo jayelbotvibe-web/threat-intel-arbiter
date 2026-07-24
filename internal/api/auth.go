@@ -34,6 +34,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Cap the unauthenticated request body — no login payload is remotely this
+	// large, and without a limit a POST with a multi-GB body is read into memory.
+	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
+
 	var body struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -54,8 +58,14 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil || user == nil {
 		// Dummy argon2 verify so timing matches the valid-user path
 		verifyArgon2Empty("decoy", decoyHash)
-		// Still count against per-account limiter for brute-force protection
-		s.limiter.allow("user:"+body.Username, 20, 5*time.Minute)
+		// Enforce the per-account limiter identically to the valid-user branch
+		// below. If we only counted here (without acting on the result), a
+		// nonexistent user would always return 401 while a real user returns
+		// 429 once throttled — a username-enumeration oracle.
+		if !s.limiter.allow("user:"+body.Username, 20, 5*time.Minute) {
+			writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many attempts, try again later"})
+			return
+		}
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 		return
 	}

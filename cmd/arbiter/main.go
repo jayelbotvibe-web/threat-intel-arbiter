@@ -75,7 +75,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start MISP poller if configured in sources.yaml
+	// Start MISP poller if configured in sources.json
 	for _, src := range cfg.Sources.Sources {
 		if !src.Enabled || src.Type != "misp" {
 			continue
@@ -101,16 +101,24 @@ func main() {
 		}()
 	}
 
+	// KEV matcher and KEV poller share one catalog: every poll refreshes the
+	// matcher's known-exploited set from the live CISA feed, so KEV scoring is
+	// driven by the real catalog rather than a hardcoded list.
+	kevMatcher := match.NewKEVMatcher(nil)
+	kevSourceConfigured := false
+
 	// Start KEV poller if any KEV source is configured
 	for _, src := range cfg.Sources.Sources {
 		if !src.Enabled || src.Type != "cisa-kev" {
 			continue
 		}
+		kevSourceConfigured = true
 		kevClient := source.NewKEVClient(src.URL)
 		kevPoller := &source.KEVPoller{
-			Client:   kevClient,
-			Events:   eventQueue,
-			Interval: 24 * time.Hour,
+			Client:    kevClient,
+			Events:    eventQueue,
+			Interval:  24 * time.Hour,
+			OnCatalog: kevMatcher.Replace,
 		}
 		go func() {
 			log.Printf("starting KEV poller: %s", src.URL)
@@ -132,10 +140,11 @@ func main() {
 		case "SectorMatcher":
 			matchers = append(matchers, &match.SectorMatcher{})
 		case "KEVMatcher":
-			// TODO: load KEV CVEs from real KEV catalog or config
-			matchers = append(matchers, match.NewKEVMatcher([]string{
-				"CVE-2024-38472", "CVE-2024-28941", "CVE-2024-27318",
-			}))
+			// Shares its catalog with the KEV poller (populated live via OnCatalog).
+			matchers = append(matchers, kevMatcher)
+			if !kevSourceConfigured {
+				log.Printf("warning: KEVMatcher enabled but no cisa-kev source configured — KEV catalog will be empty until a source feeds it")
+			}
 		}
 	}
 	matchEngine := match.NewEngine(matchers...)
@@ -143,7 +152,7 @@ func main() {
 
 	riskEngine := risk.NewEngineWithConfig(cfg.Risk)
 
-	// Build router from routing.yaml
+	// Build router from routing.json
 	var rules []notify.Rule
 	for _, r := range cfg.Routing.Rules {
 		rules = append(rules, notify.Rule{

@@ -92,36 +92,42 @@ func Parse(v string) (scheme Scheme, tuple []int, err error) {
 func InRange(version, start, end string) (bool, string) {
 	verScheme, verTuple, err := Parse(version)
 	if err != nil {
-		// Can't parse version — conservative: assume affected
+		// Can't parse the installed version — conservative: assume affected.
 		return true, "product_only_match"
 	}
-	_ = verScheme
-	// Compare against start
+
+	// boundsConfirmed stays true only if every provided bound was actually
+	// comparable. An UNPARSEABLE bound must never suppress the match: "we
+	// could not evaluate this bound" is not the same as "not affected".
+	// Suppressing on an unparseable CVE range boundary (e.g. "unspecified",
+	// "3.x", a git hash) would silently drop a real, applicable threat — the
+	// worst outcome for this tool. We downgrade confidence instead of dropping.
+	boundsConfirmed := true
+
+	// Compare against start (lower bound).
 	if start != "" {
-		_, startTuple, err := Parse(start)
-		if err != nil {
-			return false, "unparseable_version"
-		}
-		if compareTuples(verTuple, startTuple) < 0 {
-			return false, "exact_version_match" // version is below affected range — not affected
+		if _, startTuple, perr := Parse(start); perr != nil {
+			boundsConfirmed = false
+		} else if compareTuples(verTuple, startTuple) < 0 {
+			return false, "exact_version_match" // definitively below affected range — not affected
 		}
 	}
 
-	// Compare against end
+	// Compare against end (upper bound).
 	if end != "" {
-		_, endTuple, err := Parse(end)
-		if err != nil {
-			return false, "unparseable_version"
-		}
-		if compareTuples(verTuple, endTuple) > 0 {
-			return false, "exact_version_match" // version is above affected range — not affected
+		if _, endTuple, perr := Parse(end); perr != nil {
+			boundsConfirmed = false
+		} else if compareTuples(verTuple, endTuple) > 0 {
+			return false, "exact_version_match" // definitively above affected range — not affected
 		}
 	}
 
-	// Version falls within affected range AND we could parse it
-	if verScheme != SchemeUnknown {
+	// Within the affected range and every bound was comparable → exact match.
+	if boundsConfirmed && verScheme != SchemeUnknown {
 		return true, "exact_version_match"
 	}
+	// A bound was unparseable, or the version scheme is unknown — affected,
+	// but we cannot assert an exact version match.
 	return true, "product_only_match"
 }
 

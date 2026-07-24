@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+// maxRateLimitKeys bounds the tracked-key map. If an attacker cycles unique
+// keys (usernames / spoofed IPs) faster than the 5-minute evictor reclaims
+// them, we prune dead keys inline before admitting a new one — preventing
+// unbounded memory growth between eviction ticks.
+const maxRateLimitKeys = 50000
+
 // rateLimiter provides per-IP and per-account rate limiting for login attempts.
 type rateLimiter struct {
 	mu       sync.Mutex
@@ -39,6 +45,11 @@ func (rl *rateLimiter) allow(key string, maxAttempts int, window time.Duration) 
 	if len(recent) >= maxAttempts {
 		return false
 	}
+	// Bound memory: before adding a brand-new key, prune dead ones if the map
+	// has grown large from attacker-controlled key churn.
+	if _, exists := rl.attempts[key]; !exists && len(rl.attempts) >= maxRateLimitKeys {
+		rl.evictLocked()
+	}
 	rl.attempts[key] = append(rl.attempts[key], now)
 	return true
 }
@@ -64,6 +75,12 @@ func (rl *rateLimiter) evictor(interval time.Duration) {
 func (rl *rateLimiter) evict() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
+	rl.evictLocked()
+}
+
+// evictLocked removes keys whose timestamps are all stale. The caller must
+// already hold rl.mu.
+func (rl *rateLimiter) evictLocked() {
 	cutoff := time.Now().Add(-5 * time.Minute)
 	for key, times := range rl.attempts {
 		hasRecent := false

@@ -109,6 +109,38 @@ func TestInRange(t *testing.T) {
 	}
 }
 
+// TestInRange_UnparseableBoundary guards the false-negative fix: when a CVE
+// range boundary can't be parsed, the version must NOT be suppressed — it
+// falls back to product_only_match rather than being dropped as "not affected".
+func TestInRange_UnparseableBoundary(t *testing.T) {
+	tests := []struct {
+		name     string
+		version  string
+		start    string
+		end      string
+		affected bool
+		conf     string
+	}{
+		{"unparseable end → not suppressed", "2.4.30", "2.4.0", "unspecified", true, "product_only_match"},
+		{"unparseable start → not suppressed", "2.4.30", "3.x", "2.4.56", true, "product_only_match"},
+		{"both bounds unparseable", "2.4.30", "n/a", "unspecified", true, "product_only_match"},
+		// A parseable, definitively-out-of-range version is still correctly suppressed.
+		{"definitively below still suppressed", "2.3.9", "2.4.0", "2.4.56", false, "exact_version_match"},
+		{"definitively above still suppressed", "2.5.0", "2.4.0", "2.4.56", false, "exact_version_match"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			affected, conf := InRange(tt.version, tt.start, tt.end)
+			if affected != tt.affected {
+				t.Errorf("affected = %v, want %v", affected, tt.affected)
+			}
+			if conf != tt.conf {
+				t.Errorf("confidence = %s, want %s", conf, tt.conf)
+			}
+		})
+	}
+}
+
 func TestCompareTuples(t *testing.T) {
 	tests := []struct {
 		a, b []int

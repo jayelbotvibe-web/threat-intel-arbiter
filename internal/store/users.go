@@ -247,7 +247,9 @@ func verifyLegacy(password, stored string) bool {
 		return false
 	}
 	h := sha256.Sum256(append(salt, []byte(password)...))
-	return hex.EncodeToString(h[:]) == parts[1]
+	// Constant-time compare, matching the Argon2 path — avoids a timing side
+	// channel on the legacy verification branch.
+	return subtle.ConstantTimeCompare([]byte(hex.EncodeToString(h[:])), []byte(parts[1])) == 1
 }
 
 // IsLegacyHash returns true if the stored hash uses the old SHA-256 format.

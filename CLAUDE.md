@@ -71,7 +71,8 @@ data that computed the score, deliberately (commit `e3d4e35`). Don't split them.
 ## Gotchas
 
 - **Config is JSON, not YAML**, in `config/`: `org.json`, `sources.json`, `matchers.json`,
-  `risk.json`, `routing.json`. A comment in `main.go` says "sources.yaml" — it lies.
+  `risk.json`, `routing.json`. (Note: `notify.Rule` and the config structs still carry
+  dead `yaml:` struct tags — harmless, fields are populated manually in `main.go`.)
 - **`config/techstack.csv` is gitignored** and must be created:
   `cp config/techstack.csv.example config/techstack.csv`
 - **The tracked config carries placeholder org identity**, not neutral defaults —
@@ -82,7 +83,8 @@ data that computed the score, deliberately (commit `e3d4e35`). Don't split them.
   `SLACK_WEBHOOK_URL`, `TEAMS_WEBHOOK_URL`, `CROWDSTRIKE_*`, `TRUSTED_PROXY`.
 - CrowdStrike falls into **mock mode** when `CROWDSTRIKE_CLIENT_ID` is empty.
 - Warning CVEs are hardcoded in `main.go` (`LoadWarningCVEs("CVE-2024-99999", ...)`) — a
-  stub, not config-driven.
+  stub, not config-driven. (The KEV *matcher* was a similar hardcoded stub but is now
+  fed live from the KEV poller's catalog via `KEVMatcher.Replace` — see the 2026-07 review.)
 - First start seeds an `admin` account with a random one-time password printed to stdout.
 - Needs a reachable MISP instance; KEV-only mode is roadmap, not implemented.
 - `tools/start.sh` is destructive-adjacent: `pkill`s the arbiter, removes VMware `.lck`
@@ -94,3 +96,11 @@ Feature-complete for its v1 scope, not a prototype. Zero TODO/FIXME markers. Rec
 is a security-hardening arc: constant-time key comparison, rate-limit eviction, session
 invalidation on user delete/demote/password change, TLS verification restored by default.
 `VERIFICATION-v3.md` documents that round.
+
+A 2026-07 code review added: KEVMatcher fed from the live catalog (not a hardcoded list);
+`version.InRange` no longer suppresses a match when a CVE range *boundary* is unparseable
+(false-negative fix — downgrades to `product_only_match` instead of dropping); rate-limit
+key keyed per-host not per-connection (`net.SplitHostPort`); login enumeration-oracle
+closed; rightmost-XFF when proxied; HTTP server timeouts + login body cap; constant-time
+legacy hash verify; rate-limit key ceiling. **Still open:** version ranges are inclusive-only
+(no `versionEndExcluding` support) — a false-positive at the exact patched version.

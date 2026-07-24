@@ -1,7 +1,6 @@
 package api
 
 import (
-	"crypto/subtle"
 	"database/sql"
 	"embed"
 	"encoding/json"
@@ -9,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -63,8 +63,19 @@ func (s *Server) SetEventQueue(q chan<- model.ThreatEvent) {
 func (s *Server) getClientIP(r *http.Request) string {
 	if s.TrustProxy {
 		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-			return strings.TrimSpace(strings.Split(fwd, ",")[0])
+			// Use the RIGHTMOST entry — the address our own proxy observed and
+			// appended. Leftmost entries are client-supplied and spoofable, so
+			// keying the rate limiter on them would let an attacker mint a fresh
+			// bucket per request via a forged header.
+			parts := strings.Split(fwd, ",")
+			return strings.TrimSpace(parts[len(parts)-1])
 		}
+	}
+	// r.RemoteAddr is "host:port". Strip the port so the rate-limit key is
+	// per-host: otherwise each new TCP connection (a fresh ephemeral port)
+	// gets its own bucket and per-IP throttling never triggers.
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
 	}
 	return r.RemoteAddr
 }
@@ -74,10 +85,20 @@ func (s *Server) isSecure(r *http.Request) bool {
 	return r.TLS != nil || (s.TrustProxy && r.Header.Get("X-Forwarded-Proto") == "https")
 }
 
-// ListenAndServe starts the HTTP server.
+// ListenAndServe starts the HTTP server with explicit timeouts. The default
+// http.Server has none, which leaves unauthenticated endpoints (/login,
+// /health) open to Slowloris-style connection exhaustion.
 func (s *Server) ListenAndServe(addr string) error {
 	log.Printf("api: listening on %s", addr)
-	return http.ListenAndServe(addr, s.Mux)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           s.Mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	return srv.ListenAndServe()
 }
 
 func (s *Server) registerRoutes() {
@@ -128,22 +149,6 @@ func (s *Server) serveDashboard(w http.ResponseWriter, r *http.Request) {
 	html, _ := fs.ReadFile(dashboardFS, "dashboard.html")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write(html)
-}
-
-// auth wraps a handler with API key authentication.
-func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if s.AdminKey == "" {
-			http.Error(w, `{"error":"admin key not configured"}`, http.StatusInternalServerError)
-			return
-		}
-		key := r.Header.Get("X-Arbiter-Key")
-		if s.AdminKey == "" || subtle.ConstantTimeCompare([]byte(key), []byte(s.AdminKey)) != 1 {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
-			return
-		}
-		next(w, r)
-	}
 }
 
 // ─────────────────────────────────────────────────────────────
