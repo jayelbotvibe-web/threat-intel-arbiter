@@ -557,6 +557,20 @@ func isPrivateIP(ip string) bool {
 	if parsed == nil {
 		return true // can't parse = reject
 	}
+	// Cover IPv6 (and IPv4) reserved space that the IPv4-only CIDR list misses:
+	// loopback (::1), link-local (fe80::/10), unique-local (fc00::/7),
+	// unspecified (::), and multicast. Without this an IPv6 loopback/ULA IOC
+	// would be pushed to the EDR as a real indicator.
+	if parsed.IsLoopback() || parsed.IsPrivate() || parsed.IsLinkLocalUnicast() ||
+		parsed.IsLinkLocalMulticast() || parsed.IsMulticast() || parsed.IsUnspecified() {
+		return true
+	}
+	// Reject IPv4-mapped IPv6 (::ffff:a.b.c.d) by re-checking the embedded v4.
+	if v4 := parsed.To4(); v4 != nil && v4.String() != parsed.String() {
+		if isPrivateIP(v4.String()) {
+			return true
+		}
+	}
 	for _, n := range compiledPrivateNets {
 		if n.Contains(parsed) {
 			return true

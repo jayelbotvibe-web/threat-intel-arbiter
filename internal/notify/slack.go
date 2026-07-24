@@ -3,14 +3,28 @@ package notify
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/model"
 )
+
+// redactPostErr strips the request URL from a transport error before it is
+// returned/logged. A Slack/Teams incoming-webhook URL *is* the credential, and
+// *url.Error embeds it in its Error() string, so wrapping it with %w would leak
+// the secret into logs on any network failure.
+func redactPostErr(what string, err error) error {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		return fmt.Errorf("%s failed: %s: %v", what, ue.Op, ue.Err)
+	}
+	return fmt.Errorf("%s failed: %v", what, err)
+}
 
 // SlackNotifier sends alerts to a Slack incoming webhook.
 type SlackNotifier struct {
@@ -65,7 +79,7 @@ func (n *SlackNotifier) Send(alert model.Alert) error {
 	body, _ := json.Marshal(payload)
 	resp, err := n.HTTP.Post(n.WebhookURL, "application/json", bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("slack post: %w", err)
+		return redactPostErr("slack post", err)
 	}
 	defer resp.Body.Close()
 
@@ -120,7 +134,7 @@ func (n *TeamsNotifier) Send(alert model.Alert) error {
 	body, _ := json.Marshal(payload)
 	resp, err := n.HTTP.Post(n.WebhookURL, "application/json", bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("teams post: %w", err)
+		return redactPostErr("teams post", err)
 	}
 	defer resp.Body.Close()
 

@@ -44,6 +44,10 @@ type KEVClient struct {
 // DefaultKEVURL is the public CISA KEV JSON endpoint.
 const DefaultKEVURL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 
+// maxKEVResponseBytes bounds how much of the KEV feed we buffer/decode. The
+// real catalog is a few MB; this leaves generous headroom while capping DoS.
+const maxKEVResponseBytes = 128 << 20 // 128 MB
+
 // NewKEVClient creates a KEV catalog client.
 func NewKEVClient(url string) *KEVClient {
 	if url == "" {
@@ -63,13 +67,16 @@ func (c *KEVClient) Fetch() ([]KEVEntry, error) {
 	}
 	defer resp.Body.Close()
 
+	// Cap the response read to bound memory against a hostile/misbehaving host.
+	limited := io.LimitReader(resp.Body, maxKEVResponseBytes)
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(limited)
 		return nil, fmt.Errorf("KEV API returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var catalog KEVResponse
-	if err := json.NewDecoder(resp.Body).Decode(&catalog); err != nil {
+	if err := json.NewDecoder(limited).Decode(&catalog); err != nil {
 		return nil, fmt.Errorf("decode KEV: %w", err)
 	}
 

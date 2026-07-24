@@ -40,11 +40,12 @@ func (db *DB) SaveAlert(alert model.Alert, ttl time.Duration) (bool, error) {
 
 	_, err = db.conn.Exec(
 		`INSERT OR REPLACE INTO alerts
-		(id, event_id, severity, confidence, explanation, status, matched_apps, routed_to, created_at, org_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'default')`,
+		(id, event_id, severity, confidence, explanation, status, matched_apps, routed_to, action, created_at, org_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'default')`,
 		alert.ID, alert.EventID, alert.Severity, alert.Confidence,
 		alert.Explanation, alert.Status,
 		string(matchedJSON), string(routedJSON),
+		alert.Action, // SSVC decision — must be persisted; the dashboard's Act/Attend/Track buckets read this back
 		alert.CreatedAt,
 	)
 	if err != nil {
@@ -62,7 +63,13 @@ func (db *DB) CleanDedup(ttl time.Duration) error {
 }
 
 // SuppressAlertsForEvent marks all alerts for a given event as suppressed
-// (retracted intel — the source event was deleted or withdrawn).
-func (db *DB) SuppressAlertsForEvent(eventID string) {
-	db.conn.Exec("UPDATE alerts SET status = 'suppressed' WHERE event_id = ?", eventID)
+// (retracted intel — the source event was deleted or withdrawn). Returns an
+// error so the caller can detect (and log) a failed suppression rather than
+// leaving retracted-threat alerts silently active.
+func (db *DB) SuppressAlertsForEvent(eventID string) error {
+	_, err := db.conn.Exec("UPDATE alerts SET status = 'suppressed' WHERE event_id = ?", eventID)
+	if err != nil {
+		return fmt.Errorf("suppress alerts for %s: %w", eventID, err)
+	}
+	return nil
 }

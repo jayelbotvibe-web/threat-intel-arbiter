@@ -47,17 +47,33 @@ func NewEmailNotifier(host, port, from, password string) *EmailNotifier {
 
 func (n *EmailNotifier) Name() string { return "email" }
 
+// headerSafe strips characters that could break out of an SMTP header line:
+// CR, LF, and other control characters are removed so source-controlled text
+// cannot inject additional headers (e.g. Bcc) via header injection.
+func headerSafe(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\r' || r == '\n' || r < 0x20 {
+			return -1
+		}
+		return r
+	}, s)
+}
+
 func (n *EmailNotifier) Send(alert model.Alert) error {
 	if n.Host == "" {
 		return fmt.Errorf("email: no SMTP host configured")
 	}
 
-	// Build plain text email
-	subject := fmt.Sprintf("[Threat Intel Arbiter] %s: %s",
-		strings.ToUpper(alert.Severity), alert.Explanation[:min(len(alert.Explanation), 80)])
+	// Build the Subject from structured fields (severity + event id), and run
+	// every header value through headerSafe so CR/LF from source-controlled
+	// content (e.g. a MISP event title) can never inject additional SMTP
+	// headers such as Bcc. Using alert.Explanation raw here was a header
+	// injection vector (and its embedded "\n\n" already broke the subject).
+	subject := headerSafe(fmt.Sprintf("[Threat Intel Arbiter] %s: %s (confidence: %s)",
+		strings.ToUpper(alert.Severity), alert.EventID, alert.Confidence))
 
-	body := fmt.Sprintf("From: %s\r\n", n.From)
-	body += fmt.Sprintf("To: %s\r\n", n.From) // default to self; routing.yaml overrides
+	body := fmt.Sprintf("From: %s\r\n", headerSafe(n.From))
+	body += fmt.Sprintf("To: %s\r\n", headerSafe(n.From)) // default to self
 	body += fmt.Sprintf("Subject: %s\r\n", subject)
 	body += "MIME-Version: 1.0\r\n"
 	body += "Content-Type: text/plain; charset=\"utf-8\"\r\n"

@@ -102,5 +102,25 @@ A 2026-07 code review added: KEVMatcher fed from the live catalog (not a hardcod
 (false-negative fix — downgrades to `product_only_match` instead of dropping); rate-limit
 key keyed per-host not per-connection (`net.SplitHostPort`); login enumeration-oracle
 closed; rightmost-XFF when proxied; HTTP server timeouts + login body cap; constant-time
-legacy hash verify; rate-limit key ceiling. **Still open:** version ranges are inclusive-only
-(no `versionEndExcluding` support) — a false-positive at the exact patched version.
+legacy hash verify; rate-limit key ceiling.
+
+A 2026-07 round-2 review (notify/source/store) added: **SSVC `action` is now persisted**
+in `store.SaveAlert` (the INSERT previously omitted the column, so the dashboard's
+Act/Attend/Track buckets were always empty); MISP normalizer parses **CPE attributes into
+`AffectedProducts`** (enables version-aware CVE matching — CVE-only events still fall back to
+title matching by data necessity); **email Subject is header-injection-safe** (`headerSafe`
+strips CR/LF); router treats an **empty `confidence` list as match-all** (was silently
+dropping every medium alert) and logs unregistered-channel/zero-delivery misses;
+`io.LimitReader` caps on MISP/KEV response reads; **IPv6** loopback/ULA/link-local now block
+in the CrowdStrike IOC denylist; webhook secret URLs are redacted from error logs;
+`SuppressAlertsForEvent` returns/loggs its error.
+
+**Still open (known, not yet fixed):**
+- **Per-rule notify routing** (`notify.Rule` has no `EmailTo`/`SlackChannel`) — email always
+  goes to `SMTP_FROM`; `routing.json`'s per-recipient split is not honored. Needs a
+  `Notifier.Send` interface change. Delivery itself works (all matched alerts route to the
+  configured channel); only per-recipient splitting is missing.
+- Version ranges are inclusive-only (no `versionEndExcluding`) — false-positive at the exact
+  patched version.
+- Lower-priority: strict CSV load aborts on one bad row; `http://` MISP sends key in
+  cleartext; `PullInterval` is dead config; dedup TOCTOU; Slack/Teams markdown injection.

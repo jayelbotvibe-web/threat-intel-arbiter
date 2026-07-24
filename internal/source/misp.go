@@ -17,6 +17,11 @@ import (
 	"github.com/jayelbotvibe-web/threat-intel-arbiter/internal/model"
 )
 
+// maxMISPResponseBytes caps how much of a MISP HTTP response we buffer, so a
+// hostile or misbehaving server can't exhaust memory. Real restSearch payloads
+// are well under this.
+const maxMISPResponseBytes = 128 << 20 // 128 MB
+
 // MISPClient is a REST client for the MISP threat intelligence platform.
 // It handles HMAC-SHA256 request signing as required by MISP's API.
 type MISPClient struct {
@@ -225,7 +230,9 @@ func (c *MISPClient) doRequest(method, urlStr string, body io.Reader) ([]byte, e
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	// Cap the response read so a compromised/MITM'd MISP (trivial when the lab
+	// TLS-skip flag is on) can't OOM the arbiter with a multi-GB body.
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxMISPResponseBytes))
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
@@ -268,6 +275,16 @@ func NormalizeMISPEvent(raw MISPEvent) model.ThreatEvent {
 		// Extract references
 		if attr.Type == "link" {
 			event.References = append(event.References, attr.Value)
+		}
+		// Extract CPE product/version into AffectedProducts. This is what lets
+		// the CVE matcher version-compare (reach exact_version_match) instead of
+		// relying only on the weak title-keyword fallback. Events that carry a
+		// CVE but no CPE still match by title — that is a source-data limit, not
+		// something we can synthesize here (the tool does no NVD/CPE enrichment).
+		if attr.Type == "cpe" {
+			if ap, ok := parseCPE(attr.Value); ok {
+				event.AffectedProducts = append(event.AffectedProducts, ap)
+			}
 		}
 		// Extract IOCs for EDR integration
 		iocType := mapMISPToIOCType(attr.Type)
@@ -345,6 +362,53 @@ func parseCVSS(s string) (float64, error) {
 		return 0, err
 	}
 	return score, nil
+}
+
+// parseCPE parses a CPE 2.2 (cpe:/a:vendor:product:version) or CPE 2.3
+// (cpe:2.3:a:vendor:product:version:...) string into an AffectedProduct.
+// Returns ok=false if vendor/product can't be extracted. A concrete version
+// (not "*"/"-") is recorded as an exact affected version so the CVE matcher can
+// version-compare against the tech stack.
+func parseCPE(cpe string) (model.AffectedProduct, bool) {
+	s := strings.TrimSpace(strings.ToLower(cpe))
+	var fields []string
+	switch {
+	case strings.HasPrefix(s, "cpe:2.3:"):
+		fields = strings.Split(strings.TrimPrefix(s, "cpe:2.3:"), ":") // part,vendor,product,version,...
+	case strings.HasPrefix(s, "cpe:/"):
+		fields = strings.Split(strings.TrimPrefix(s, "cpe:/"), ":") // part,vendor,product,version,...
+	default:
+		return model.AffectedProduct{}, false
+	}
+	if len(fields) < 3 {
+		return model.AffectedProduct{}, false
+	}
+	vendor := cpeUnbind(fields[1])
+	product := cpeUnbind(fields[2])
+	if vendor == "" || product == "" {
+		return model.AffectedProduct{}, false
+	}
+	ap := model.AffectedProduct{Vendor: vendor, Product: product}
+	if len(fields) >= 4 {
+		if ver := cpeUnbind(fields[3]); ver != "" {
+			ap.VersionStart = ver
+			ap.VersionEnd = ver // CPE names a specific affected version
+		}
+	}
+	return ap, true
+}
+
+// cpeUnbind converts a CPE well-formed-name component to a plain string:
+// wildcards become empty, underscores become spaces (CPE convention for
+// spaces), and escaped characters are unescaped.
+func cpeUnbind(s string) string {
+	if s == "" || s == "*" || s == "-" {
+		return ""
+	}
+	s = strings.ReplaceAll(s, `\:`, ":")
+	s = strings.ReplaceAll(s, `\`, "")
+	s = strings.ReplaceAll(s, "_", " ")
+	return strings.TrimSpace(s)
 }
 
 // mapMISPToIOCType maps a MISP attribute type to an IOC type for EDR integration.

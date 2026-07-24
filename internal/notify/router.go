@@ -49,23 +49,33 @@ func (r *Router) Route(alert model.Alert) []string {
 
 ruleLoop:
 	for _, rule := range r.Rules {
-		// Match severity
-		if rule.Severity != alert.Severity {
+		// Match severity (case-insensitive, consistent with confidence).
+		if !strings.EqualFold(rule.Severity, alert.Severity) {
 			continue
 		}
-		// Match confidence
-		if !containsAny(rule.Confidence, strings.ToLower(alert.Confidence)) {
+		// Match confidence. An empty confidence list means "any confidence" —
+		// otherwise a rule that omits the field would match nothing and silently
+		// drop every alert of that severity.
+		if len(rule.Confidence) > 0 && !containsAny(rule.Confidence, strings.ToLower(alert.Confidence)) {
 			continue
 		}
 		// Send to each channel
 		for _, channel := range rule.Channels {
-			if n, ok := r.Notifiers[channel]; ok {
-				if err := n.Send(alert); err != nil {
-					log.Printf("notify: %s failed for alert %s: %v", channel, alert.ID, err)
-					continue
-				}
-				routed = append(routed, channel)
+			n, ok := r.Notifiers[channel]
+			if !ok {
+				// A rule names a channel with no registered notifier — a config
+				// typo would otherwise blackhole the alert with no trace.
+				log.Printf("notify: rule for alert %s names unregistered channel %q — skipped", alert.ID, channel)
+				continue
 			}
+			if err := n.Send(alert); err != nil {
+				log.Printf("notify: %s failed for alert %s: %v", channel, alert.ID, err)
+				continue
+			}
+			routed = append(routed, channel)
+		}
+		if len(rule.Channels) > 0 && len(routed) == 0 {
+			log.Printf("notify: WARNING alert %s (%s) matched a rule but reached 0 channels", alert.ID, alert.Severity)
 		}
 		break ruleLoop // first matching rule wins
 	}
